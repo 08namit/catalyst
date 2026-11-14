@@ -210,14 +210,24 @@ describe('two-node e2e (real CLI, real daemons)', { concurrent: false }, () => {
       const s = await state(dir);
       return s.state.conflicts.find((c) => c.scope === 'decision' && c.key === TOPIC) ?? null;
     };
-    const [cfA, cfB] = await Promise.all([waitFor('conflict on A', () => conflictOn(A)), waitFor('conflict on B', () => conflictOn(B))]);
+    // v0.2: Bob's decision competes with the base version immediately, so B shows a conflict before Alice's
+    // revision arrives; wait until both nodes show the same final pair of heads.
+    const expected = [ra.event.id, rb.event.id].sort();
+    const headsOn = async (dir: string) => {
+      const cf = await conflictOn(dir);
+      const ids = cf ? cf.heads.map((h) => h.id).sort() : [];
+      return JSON.stringify(ids) === JSON.stringify(expected) ? cf : null;
+    };
+    const [cfA, cfB] = await Promise.all([waitFor('conflict on A', () => headsOn(A)), waitFor('conflict on B', () => headsOn(B))]);
     const headsA = cfA.heads.map((h) => h.id).sort();
-    expect(headsA).toEqual([ra.event.id, rb.event.id].sort());
+    expect(headsA).toEqual(expected);
     expect(cfB.heads.map((h) => h.id).sort()).toEqual(headsA);
-    // Both revisions superseded the same base version.
+    // v0.2: a default revision supersedes only the writer's own heads. Alice revised her base version; Bob's
+    // decision replaces nothing (it is a competing head), so the topic is in conflict either way.
     const topicA = (await state(A)).state.decisions.find((d) => d.topic === TOPIC)!;
     expect(topicA.conflict).toBe(true);
-    for (const h of topicA.heads) expect(h.supersedes).toEqual([base]);
+    expect(topicA.heads.find((h) => h.id === ra.event.id)!.supersedes).toEqual([base]);
+    expect(topicA.heads.find((h) => h.id === rb.event.id)!.supersedes).toEqual([]);
     const st = await status(A);
     expect(st.conflicts.some((c) => c.key === TOPIC)).toBe(true);
 

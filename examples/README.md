@@ -8,18 +8,21 @@ mode 0600), which `catalyst setup` adds to `.gitignore`. Never commit `.catalyst
 |---|---|---|
 | `catalyst.config.example.json` | Per-checkout project config (no secrets) | `.catalyst/config.json`, written by `catalyst init` / `catalyst join` |
 | `mcp.json.example` | Claude Code project MCP config registering the `catalyst` stdio server | `.mcp.json` (committed) |
-| `claude-settings.example.json` | Hooks + `mcp__catalyst` permission | `.claude/settings.json` (committed) |
+| `claude-settings.example.json` | Hooks (incl. the v0.2 `PreToolUse`, `SubagentStart`, `SubagentStop`) + `mcp__catalyst` permission | `.claude/settings.json` (committed) |
 | `inbox-draft.tool.example.json` | Fallback draft written by an agent when the Catalyst tools are unavailable | `.catalyst/inbox/<uuid>.json` |
 | `inbox-draft.event.example.json` | Fallback draft written by a hook (auto-captured activity) when the daemon is down | `.catalyst/inbox/<id>.json` |
 
-`catalyst setup` writes the `.mcp.json` and `.claude/settings.json` entries for you, merging them into any
-existing configuration (and `catalyst uninstall` removes only them), so you rarely need to copy these by hand.
+Setup (Claude's `start_project` / `join_project` tools, or `catalyst init` / `join` / `setup claude`) writes the
+`.mcp.json` and `.claude/settings.json` entries for you, merging them into any existing configuration
+(`catalyst uninstall claude` removes only them), so you rarely need to copy these by hand. `catalyst install`
+also registers the `catalyst` MCP server once per person at user scope, so Claude has the setup tools before a
+project exists.
 
 ## `catalyst.config.example.json` fields
 
 JSON has no comments, so the fields are described here.
 
-- `projectId` — shared by every participant of the project (`prj_` + 24 hex). Created by `catalyst init`.
+- `projectId` — shared by every participant of the project (`prj_` + 24 hex). Created by `start_project` / `catalyst init`.
 - `projectName` — display name.
 - `participantId` — this checkout's identity (`p_` + 24 hex, derived from its Ed25519 public key). Each checkout is one participant.
 - `name` — your display name shown to the teammate.
@@ -27,7 +30,7 @@ JSON has no comments, so the fields are described here.
 - `peerBind` — bind address of the peer listener: `0.0.0.0` for LAN, `127.0.0.1` for single-machine tests.
 - `apiPort` — loopback API port; `0` = random per start (the actual port is in `daemon.json`).
 - `advertiseHosts` — hosts/IPs put into invitations; empty = auto-detect non-internal IPv4 addresses.
-- `createdByMe` — `true` on the checkout that ran `catalyst init`.
+- `createdByMe` — `true` on the checkout that created the project.
 - `autoHandover` — regenerate `IMPORTANT.md` automatically after material changes (default `true`).
 - `createdAt` — ISO timestamp.
 
@@ -39,6 +42,10 @@ JSON has no comments, so the fields are described here.
 - Every hook command is guarded with `command -v catalyst … || true`, so a teammate without Catalyst installed is
   unaffected. Hooks print nothing unless they have context for Claude, never block, and only the SessionStart hook
   may start the daemon.
+- v0.2 hooks: `PreToolUse` (matcher `mcp__catalyst__.*`) adds `_caller: {agentId, agentType}` to every Catalyst
+  tool call so the daemon knows which agent is calling (the main session has none and counts as `lead`).
+  `SubagentStart` registers a new subagent, names it and gives it its instructions; `SubagentStop` marks it
+  finished and returns its unfinished tasks to the queue.
 
 ## Inbox drafts (fallback when the daemon is unavailable)
 

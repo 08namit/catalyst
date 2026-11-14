@@ -303,7 +303,7 @@ describe('transport and protocol rejection', () => {
     const error = nextFrame(conn, f => f.t === 'error'); conn.send(hello(b, overrides));
     const frame = await error;
     expect(frame).toMatchObject({ code, fatal: true });
-    if (frame.t === 'error' && code === 'incompatible_protocol') expect(frame.message).toMatch(/99.*1/);
+    if (frame.t === 'error' && code === 'incompatible_protocol') expect(frame.message).toMatch(/99.*2/);
     expect(frames.some(f => f.t === 'events')).toBe(false);
     expect(b.store.applied.size).toBe(0);
   });

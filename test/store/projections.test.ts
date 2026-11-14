@@ -19,11 +19,11 @@ describe('decision conflicts', () => {
     const { a, b } = makePair();
     const v1 = a.append(decision('api/format', 'Format', 'JSON')).event;
     sync(a, b);
-    // concurrent revisions: both supersede v1 by default
+    // concurrent revisions: by default a writer revises only its own head (Namit's does not supersede Tiam's v1)
     const va = a.append(decision('api/format', 'Format', 'JSON:API')).event;
     const vb = b.append(decision('api/format', 'Format', 'protobuf')).event;
     expect(va.supersedes).toEqual([v1.id]);
-    expect(vb.supersedes).toEqual([v1.id]);
+    expect(vb.supersedes).toEqual([]);
     sync(a, b);
     sync(b, a);
     for (const s of [a, b]) {
@@ -94,6 +94,9 @@ describe('projection', () => {
     a.append({ type: 'task.created', payload: { taskId: 'api', title: 'API' }, origin: 'agent' });
     a.append({ type: 'task.claimed', payload: { taskId: 'api', scope: 'server', paths: ['src/api/**'] }, origin: 'agent' });
     b.append({ type: 'task.claimed', payload: { taskId: 'api', scope: 'client' }, origin: 'agent' });
+    a.append({ type: 'agent.registered', payload: { agent: 'sub1', name: 'docs' }, origin: 'system', agent: 'sub1' });
+    a.append({ type: 'task.claimed', payload: { taskId: 'docs', scope: 'readme' }, origin: 'agent', agent: 'sub1' });
+    a.append({ type: 'task.created', payload: { taskId: 'ui', title: 'UI', dependsOn: ['api'] }, origin: 'agent', agent: 'sub1' });
     b.append(decision('api/format', 'Format', 'JSON'));
     a.append(decision('api/format', 'Format', 'XML'));
     const q = b.append({ type: 'message.posted', payload: { kind: 'question', body: 'Port?', to: a.me }, origin: 'agent' }).event;

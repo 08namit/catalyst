@@ -30,7 +30,7 @@ import {
   type EventRefs,
   type Origin,
 } from './protocol.js';
-import type { ConflictView, ProjectState, SourceRef } from './state.js';
+import type { AgentView, ConflictView, ProjectState, SourceRef, TaskView } from './state.js';
 
 export interface ApiError {
   error: { code: ApiErrorCode; message: string; hint?: string };
@@ -137,7 +137,38 @@ export interface UpdateItem extends SourceRef {
 const text = (max: number) => z.string().trim().min(1).max(max);
 const list = (maxLen: number = LIMITS.short) => z.array(text(maxLen)).max(LIMITS.listItems);
 
-export const toolInputShapes = {
+/**
+ * Caller identity. Filled in automatically by Catalyst's PreToolUse hook (matcher `mcp__catalyst__.*`) from
+ * Claude Code's hook input: subagents carry `agent_id`/`agent_type`, the main thread carries neither (= lead).
+ * The daemon maps it to an agent key with agentKeyFromId(). Models must not pass it; the hook overwrites it.
+ */
+export const callerSchema = z
+  .object({ agentId: z.string().max(100).optional(), agentType: z.string().max(80).optional() })
+  .strict()
+  .optional()
+  .describe('Filled in automatically by Catalyst. Do not pass this yourself.');
+export type CallerInfo = z.infer<typeof callerSchema>;
+
+/**
+ * A person or agent, as an agent would type it. Resolved by the daemon (case-insensitive):
+ * "all" | participant id | "p_…/agent" | participant name ("Namit") | "Name/agent-name" ("Namit/api") |
+ * agent name of one of MY agents ("api"). Ambiguous or unknown → bad_request listing the known agents.
+ */
+const recipient = z.string().trim().min(1).max(120);
+
+const queueTask = z
+  .object({
+    taskId: slugSchema.describe('Stable slug, e.g. "notes-core"'),
+    title: text(LIMITS.title),
+    description: text(LIMITS.text).optional().describe('What "done" means, contracts to follow, files involved'),
+    paths: pathsSchema.optional().describe('Paths/globs this task will touch (prevents two agents editing the same files)'),
+    dependsOn: z.array(slugSchema).max(LIMITS.listItems).optional().describe('Task ids that must be done first'),
+    assignee: recipient.optional().describe('"any" (default), "me", "teammate", a name like "Namit", or a participant id'),
+    order: z.number().int().min(0).max(1_000_000).optional(),
+  })
+  .strict();
+
+const baseToolInputShapes = {
   get_briefing: {
     task: slugSchema.optional().describe('Task id to focus on, e.g. "api-auth"'),
     topic: slugSchema.optional().describe('Decision topic to focus on'),
@@ -182,7 +213,7 @@ export const toolInputShapes = {
   send_message: {
     kind: z.enum(MESSAGE_KINDS),
     body: text(LIMITS.text),
-    to: z.union([participantIdSchema, z.literal('all')]).optional().describe('Participant id; default "all"'),
+    to: recipient.optional().describe('"all" (default), a person ("Namit"), or one agent ("Namit/api", or "api" for one of your own agents)'),
     replyTo: eventIdSchema.optional().describe('Required for kind "reply": the question event id'),
     topic: slugSchema.optional(),
     taskId: slugSchema.optional(),
@@ -193,7 +224,7 @@ export const toolInputShapes = {
     task: slugSchema.optional(),
     topic: slugSchema.optional(),
     paths: pathsSchema.optional(),
-    includeOwn: z.boolean().optional().describe('Include events authored by this participant (default false)'),
+    includeOwn: z.boolean().optional().describe('Include events written by you, this agent (default false). Events from your sibling agents are always included.'),
     unacknowledgedOnly: z.boolean().optional(),
     limit: z.number().int().min(1).max(50).optional().describe('Default 20'),
   },
@@ -206,7 +237,7 @@ export const toolInputShapes = {
     key: slugSchema.describe('Topic (decision), task id (claim) or "goal"'),
     resolution: text(LIMITS.text).describe('The agreed outcome; for decisions this becomes the new decision text'),
     chosen: eventIdSchema.optional().describe('Head event id that was chosen, if one'),
-    owner: participantIdSchema.optional().describe('For claim conflicts: the agreed owner'),
+    owner: recipient.optional().describe('For claim conflicts: the agreed owner, e.g. "Namit" or "Namit/api"'),
   },
   set_goal: {
     title: text(LIMITS.title),
@@ -224,7 +255,52 @@ export const toolInputShapes = {
     issueId: eventIdSchema,
     note: text(LIMITS.short).optional(),
   },
+  // ---- v0.2: agents, queue, waiting ----
+  set_agent_name: {
+    name: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$/).describe('Short role name for this agent, e.g. "api" or "tests"'),
+  },
+  post_tasks: {
+    tasks: z.array(queueTask).min(1).max(LIMITS.listItems).describe('Tasks to add to the shared queue (re-posting a taskId updates it)'),
+  },
+  take_next_task: {
+    taskId: slugSchema.optional().describe('Take this specific task instead of the next one in the queue'),
+  },
+  complete_task: {
+    taskId: slugSchema,
+    summary: text(LIMITS.text),
+    evidence: list(LIMITS.text).optional().describe('Verification evidence, e.g. "npm test: 42 passed"'),
+    branch: text(200).optional(),
+    commit: z.string().regex(/^[0-9a-f]{7,40}$/).optional(),
+  },
+  wait_for_updates: {
+    timeoutSec: z.number().int().min(1).max(120).optional().describe('How long to wait (default 60, max 120). Call again to keep waiting.'),
+    task: slugSchema.optional(),
+    topic: slugSchema.optional(),
+  },
+  catalyst_status: {},
+  pause_sync: {},
+  resume_sync: {},
+  invite_teammate: {
+    ttlMinutes: z.number().int().min(1).max(24 * 60).optional().describe('Default 30'),
+  },
+  // ---- setup (handled by the MCP adapter itself; work before a project exists) ----
+  start_project: {
+    yourName: text(80).optional().describe('Your name as your teammate will see it (default: git user.name)'),
+    projectName: text(LIMITS.title).optional().describe('Default: the folder name'),
+  },
+  join_project: {
+    invite: z.string().trim().regex(/^cat1_[A-Za-z0-9_-]{20,4000}$/).describe('The invite code your teammate sent (starts with cat1_)'),
+    yourName: text(80).optional(),
+  },
 } as const;
+
+/** Tools the MCP adapter answers itself (no daemon needed; they create/connect the project). */
+export const SETUP_TOOLS = ['start_project', 'join_project'] as const satisfies readonly (keyof typeof baseToolInputShapes)[];
+
+/** Raw zod shapes per tool (MCP registerTool + daemon validation). Every tool also accepts `_caller`. */
+export const toolInputShapes = Object.fromEntries(
+  Object.entries(baseToolInputShapes).map(([k, shape]) => [k, { ...shape, _caller: callerSchema }]),
+) as { [K in keyof typeof baseToolInputShapes]: (typeof baseToolInputShapes)[K] & { _caller: typeof callerSchema } };
 
 export type ToolName = keyof typeof toolInputShapes;
 export const TOOL_NAMES = Object.keys(toolInputShapes) as ToolName[];
@@ -282,6 +358,58 @@ export interface AckResult extends ToolResultBase {
   event?: { id: string; seq: number };
 }
 
+/** Who the daemon thinks is calling (returned by agent-aware tools so the model knows its own name). */
+export interface CallerView {
+  agent: string;
+  name: string;
+  displayName: string;
+}
+
+export interface TakeTaskResult extends ToolResultBase {
+  me: CallerView;
+  pick: import('./interfaces.js').QueuePick;
+  /** Present when a claim was written (reason requested/next). */
+  claim?: ClaimResult;
+  /** Accepted decisions relevant to the task (by task ref, paths or topic), as briefing items. */
+  relevant: UpdateItem[];
+}
+
+export interface WaitResult extends ToolResultBase {
+  outcome: 'updates' | 'timeout';
+  updates: UpdateItem[];
+  nextCursor: number;
+  waitedMs: number;
+}
+
+export interface StatusToolResult extends ToolResultBase {
+  me: CallerView;
+  agents: AgentView[];
+  queue: QueueSummary;
+  conflicts: ConflictView[];
+}
+
+export interface InviteToolResult extends ToolResultBase {
+  invite: InviteResponse;
+}
+
+export interface SetupToolResult {
+  text: string;
+  projectDir: string;
+  /** Joiner and (after pairing) inviter both get the code. */
+  confirmCode?: string;
+  /** true when Claude Code must be restarted once so the Catalyst hooks load (tools work without them). */
+  restartForHooks: boolean;
+}
+
+export interface QueueSummary {
+  total: number;
+  done: number;
+  inProgress: number;
+  ready: number;
+  blocked: number;
+  tasks: Array<Pick<TaskView, 'taskId' | 'title' | 'status' | 'assignee' | 'dependsOn' | 'ready' | 'ownerKeys'> & { ownerNames: string[] }>;
+}
+
 export type ToolResult<K extends ToolName> = K extends 'get_briefing'
   ? Briefing
   : K extends 'get_updates'
@@ -290,7 +418,17 @@ export type ToolResult<K extends ToolName> = K extends 'get_briefing'
       ? AckResult
       : K extends 'claim_task'
         ? ClaimResult
-        : PublishResult;
+        : K extends 'take_next_task'
+          ? TakeTaskResult
+          : K extends 'wait_for_updates'
+            ? WaitResult
+            : K extends 'catalyst_status' | 'pause_sync' | 'resume_sync'
+              ? StatusToolResult
+              : K extends 'invite_teammate'
+                ? InviteToolResult
+                : K extends 'start_project' | 'join_project'
+                  ? SetupToolResult
+                  : PublishResult;
 
 // ---------------------------------------------------------------------------
 // Non-tool endpoints
@@ -320,6 +458,38 @@ export interface StatusResponse {
   inbox: { pending: number; rejected: number; imported: number };
   snapshot: { path: string; generatedAt?: string };
   handover: { path: string; generatedAt?: string };
+  agents: AgentView[];
+  queue: QueueSummary;
+}
+
+/**
+ * POST /api/agents — SubagentStart hook registers a subagent. The daemon picks a default name
+ * "<agentType>-<n>" (unless the agent already has one), appends agent.registered (agent = key, active true)
+ * and returns `context`: text for the hook's additionalContext (who you are, how to use the queue, a short
+ * briefing).
+ */
+export const agentRegisterRequestSchema = z
+  .object({
+    agentId: z.string().min(1).max(100),
+    agentType: z.string().max(80).optional(),
+    session: z.string().max(200).optional(),
+  })
+  .strict();
+export interface AgentRegisterResponse {
+  agent: string;
+  name: string;
+  displayName: string;
+  context: string;
+}
+
+/**
+ * POST /api/agents/stop — SubagentStop hook. Appends agent.registered {active:false} and releases the agent's
+ * live claims on tasks that are not done (reason "agent finished"), returning them to the queue.
+ */
+export const agentStopRequestSchema = z.object({ agentId: z.string().min(1).max(100) }).strict();
+export interface AgentStopResponse {
+  agent: string;
+  released: string[];
 }
 
 /** GET /api/state — dashboard data. */
@@ -380,7 +550,8 @@ export interface InboxImportResponse {
 }
 
 /**
- * GET /api/unread?session=<id>&markNotified=1 — cheap summary for the UserPromptSubmit hook.
+ * GET /api/unread?session=<id>&markNotified=1[&agent=<key>] — cheap summary for the UserPromptSubmit hook.
+ * Counts are for `agent` (default lead).
  * Does NOT record retrieval or advance the session's get_updates cursor. With markNotified=1 the daemon
  * remembers the latest cursor it reported for that session so the same updates are not announced twice.
  */
@@ -414,4 +585,6 @@ export const API_ROUTES = {
   snapshot: 'POST /api/snapshot',
   inboxImport: 'POST /api/inbox/import',
   shutdown: 'POST /api/shutdown',
+  agentRegister: 'POST /api/agents',
+  agentStop: 'POST /api/agents/stop',
 } as const;

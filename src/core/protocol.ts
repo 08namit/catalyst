@@ -5,8 +5,9 @@
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { z } from 'zod';
 
-export const PROTOCOL_VERSION = 1 as const;
-export const SOFTWARE_VERSION = '0.1.0';
+/** v2: signed `agent` envelope field, agent.registered, task queue fields, agent-addressed messages. */
+export const PROTOCOL_VERSION = 2 as const;
+export const SOFTWARE_VERSION = '0.2.0';
 
 // ---------------------------------------------------------------------------
 // Limits (bounded payloads keep MCP responses and peer frames small)
@@ -39,7 +40,31 @@ export const ID_PATTERNS = {
   event: /^[0-9a-f]{64}$/,
   /** task ids / topics are human slugs: "api-auth", "db/schema" */
   slug: /^[a-z0-9][a-z0-9._/-]{0,79}$/,
+  /**
+   * Agent key: stable identity of one agent inside a participant. "lead" = the main Claude session (and any
+   * write without agent information); subagents use Claude Code's agent_id (e.g. "a7a6a241124692d30").
+   */
+  agent: /^[a-z0-9][a-z0-9._-]{0,63}$/,
+  /** "p_<24 hex>/<agent key>" — one agent of one participant (message addressing, claim owners). */
+  agentAddress: /^p_[0-9a-f]{24}\/[a-z0-9][a-z0-9._-]{0,63}$/,
 } as const;
+
+/** Agent key used for the main session and for every event without an `agent` field. */
+export const LEAD_AGENT = 'lead' as const;
+/** Agent key of an event (events without the field belong to the lead). */
+export function agentOf(e: { agent?: string }): string {
+  return e.agent ?? LEAD_AGENT;
+}
+/** Owner key "participant/agent" used for per-agent ownership (claims, progress, decision heads). */
+export function ownerKey(participant: string, agent: string = LEAD_AGENT): string {
+  return `${participant}/${agent}`;
+}
+/** Turn an arbitrary Claude agent_id into a valid agent key (lowercase, allowed chars, ≤64). */
+export function agentKeyFromId(agentId: string | undefined | null): string {
+  if (!agentId) return LEAD_AGENT;
+  const k = agentId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 64);
+  return k.length > 0 && k !== LEAD_AGENT ? k : LEAD_AGENT;
+}
 
 export function slugify(input: string): string {
   const s = input
@@ -114,6 +139,7 @@ export const EVENT_TYPES = [
   'conflict.resolved',
   'ack.recorded',
   'activity.captured',
+  'agent.registered',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -131,6 +157,7 @@ export const MATERIAL_TYPES: ReadonlySet<string> = new Set<EventType>([
   'issue.resolved',
   'message.posted',
   'conflict.resolved',
+  'agent.registered',
 ]);
 
 export interface EventRefs {
@@ -157,6 +184,11 @@ export interface UnsignedEvent {
   origin: Origin;
   /** Local session label (e.g. "claude:<session_id>" or "mcp:<pid>"); informational. */
   session?: string;
+  /**
+   * Agent key (ID_PATTERNS.agent) of the agent inside `author` that wrote this event. Absent = LEAD_AGENT.
+   * Ownership is per (author, agent): decision heads, claims, progress, acks and unread are all per agent.
+   */
+  agent?: string;
 }
 
 export interface CatalystEvent extends UnsignedEvent {
@@ -181,6 +213,7 @@ export function eventBody(e: UnsignedEvent | CatalystEvent): UnsignedEvent {
     origin: e.origin,
   };
   if (e.session !== undefined) body.session = e.session;
+  if (e.agent !== undefined) body.agent = e.agent;
   return body;
 }
 export function computeEventId(body: UnsignedEvent): string {
@@ -210,6 +243,8 @@ export const slugSchema = z.string().regex(ID_PATTERNS.slug, 'must be a lowercas
 export const eventIdSchema = z.string().regex(ID_PATTERNS.event, 'must be a 64-char hex event id');
 export const participantIdSchema = z.string().regex(ID_PATTERNS.participant, 'must be a participant id like p_<24 hex>');
 export const pathsSchema = z.array(z.string().min(1).max(LIMITS.pathLength)).max(LIMITS.paths);
+export const agentKeySchema = z.string().regex(ID_PATTERNS.agent, 'must be an agent key like "lead" or "a7a6a241124692d30"');
+export const agentAddressSchema = z.string().regex(ID_PATTERNS.agentAddress, 'must be "p_<24 hex>/<agent key>"');
 
 export const refsSchema = z
   .object({
@@ -234,6 +269,7 @@ export const envelopeSchema = z
     supersedes: z.array(eventIdSchema).max(50),
     origin: z.enum(ORIGINS),
     session: z.string().max(200).optional(),
+    agent: agentKeySchema.optional(),
     sig: z.string().min(1).max(200),
   })
   .strict();
@@ -249,7 +285,18 @@ export const payloadSchemas = {
   'project.created': z.object({ name: str(LIMITS.title), description: str(LIMITS.text).optional() }),
   'participant.joined': z.object({ name: str(80), publicKey: z.string().min(40).max(200), role: str(LIMITS.short).optional() }),
   'goal.set': z.object({ title: str(LIMITS.title), description: str(LIMITS.text).optional(), successCriteria: strList().optional() }),
-  'task.created': z.object({ taskId: slugSchema, title: str(LIMITS.title), description: str(LIMITS.text).optional(), paths: pathsSchema.optional() }),
+  'task.created': z.object({
+    taskId: slugSchema,
+    title: str(LIMITS.title),
+    description: str(LIMITS.text).optional(),
+    paths: pathsSchema.optional(),
+    /** Queue: tasks that must be "done" before this one is handed out. */
+    dependsOn: z.array(slugSchema).max(LIMITS.listItems).optional(),
+    /** Queue: who should take it — a participant id, or "any" (default). */
+    assignee: z.union([participantIdSchema, z.literal('any')]).optional(),
+    /** Queue: lower first (ties by task id). Default: posting order. */
+    order: z.number().int().min(0).max(1_000_000).optional(),
+  }),
   'task.claimed': z.object({ taskId: slugSchema, scope: str(LIMITS.text), paths: pathsSchema.optional(), note: str(LIMITS.short).optional() }),
   'task.released': z.object({ taskId: slugSchema, reason: str(LIMITS.short).optional() }),
   'decision.recorded': z.object({
@@ -276,7 +323,8 @@ export const payloadSchemas = {
   'message.posted': z.object({
     kind: z.enum(MESSAGE_KINDS),
     body: str(LIMITS.text),
-    to: z.union([participantIdSchema, z.literal('all')]).optional(),
+    /** A participant (any of its agents), one agent ("p_…/<agent>"), or "all". */
+    to: z.union([participantIdSchema, agentAddressSchema, z.literal('all')]).optional(),
     replyTo: eventIdSchema.optional(),
   }),
   'conflict.resolved': z.object({
@@ -285,6 +333,8 @@ export const payloadSchemas = {
     resolution: str(LIMITS.text),
     chosen: eventIdSchema.optional(),
     owner: participantIdSchema.optional(),
+    /** For claim conflicts: the agreed owning agent of `owner` (default LEAD_AGENT). */
+    ownerAgent: agentKeySchema.optional(),
   }),
   'ack.recorded': z.object({ eventIds: z.array(eventIdSchema).min(1).max(LIMITS.ackIds) }),
   'activity.captured': z.object({
@@ -292,6 +342,16 @@ export const payloadSchemas = {
     summary: str(LIMITS.short),
     commits: z.array(z.object({ hash: z.string().regex(/^[0-9a-f]{7,40}$/), message: str(LIMITS.short) })).max(LIMITS.listItems).optional(),
     paths: pathsSchema.optional(),
+  }),
+  /**
+   * Names an agent of the author (the event's own `agent` field must equal payload.agent). Latest version per
+   * (author, agent) in deterministic order wins. `active: false` = the agent finished (SubagentStop).
+   */
+  'agent.registered': z.object({
+    agent: agentKeySchema,
+    name: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$/, 'agent name: 1-40 chars, letters/digits/space/._-'),
+    agentType: str(80).optional(),
+    active: z.boolean().optional(),
   }),
 } satisfies Record<EventType, z.ZodType>;
 

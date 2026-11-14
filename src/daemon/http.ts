@@ -8,10 +8,14 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  agentRegisterRequestSchema,
+  agentStopRequestSchema,
   appendRequestSchema,
   inviteRequestSchema,
   peerAddrRequestSchema,
   sessionRequestSchema,
+  type AgentRegisterResponse,
+  type AgentStopResponse,
   type ApiError,
   type DashboardState,
   type DeliveryState,
@@ -21,11 +25,13 @@ import {
   type UpdateItem,
 } from '../core/api.js';
 import type { Origin } from '../core/protocol.js';
-import { MATERIAL_TYPES, formatZodError, validatePayload } from '../core/protocol.js';
+import { ID_PATTERNS, LEAD_AGENT, MATERIAL_TYPES, agentKeyFromId, formatZodError, ownerKey, validatePayload } from '../core/protocol.js';
 import type { z } from 'zod';
+import { summarizeQueue } from '../store/queue.js';
+import { agentContext, agentSession, appendRegistration, callerView, defaultAgentName, ensureRegistered, latestRegistration } from './agents.js';
 import { HttpError, badRequest, type DaemonContext } from './context.js';
 import { inboxCounts } from './inbox.js';
-import { runTool } from './tools.js';
+import { runToolAsync } from './tools.js';
 
 const MAX_BODY = 1024 * 1024;
 const STATIC_DIR = fileURLToPath(new URL('../dashboard/static/', import.meta.url));
@@ -54,6 +60,10 @@ interface Req {
   clientPid?: number;
   /** Idempotency key header (x-catalyst-client-id), validated before use. */
   clientId?: string;
+  /** Claude agent_id of the writing subagent (x-catalyst-agent; hooks inside a subagent). */
+  agentId?: string;
+  /** Aborted when the client disconnects (ends a wait_for_updates long-poll). */
+  signal: AbortSignal;
 }
 
 export interface ApiServer {
@@ -186,6 +196,8 @@ async function handle(ctx: DaemonContext, req: IncomingMessage, res: ServerRespo
   const rawClient = String(req.headers['x-catalyst-client'] ?? 'cli');
   const client: Client = rawClient === 'mcp' || rawClient === 'hook' || rawClient === 'dashboard' ? rawClient : 'cli';
   const pid = Number(req.headers['x-catalyst-client-pid']);
+  const aborter = new AbortController();
+  res.on('close', () => aborter.abort());
   const r: Req = {
     method,
     path: url.pathname,
@@ -195,13 +207,17 @@ async function handle(ctx: DaemonContext, req: IncomingMessage, res: ServerRespo
     session: String(req.headers['x-catalyst-session'] ?? '') || `${client}:anon`,
     ...(Number.isInteger(pid) && pid > 0 ? { clientPid: pid } : {}),
     clientId: typeof req.headers['x-catalyst-client-id'] === 'string' ? req.headers['x-catalyst-client-id'] : undefined,
+    agentId: typeof req.headers['x-catalyst-agent'] === 'string' && req.headers['x-catalyst-agent'].length <= 100 ? req.headers['x-catalyst-agent'] : undefined,
+    signal: aborter.signal,
   };
-  const result = route(ctx, r);
+  // Every route except the wait_for_updates long-poll runs synchronously, so writes stay serialized.
+  const result = await route(ctx, r);
+  if (res.destroyed || res.writableEnded) return;
   send(res, 200, result);
   if (r.path === '/api/shutdown') setImmediate(() => ctx.shutdown());
 }
 
-function route(ctx: DaemonContext, r: Req): unknown {
+function route(ctx: DaemonContext, r: Req): unknown | Promise<unknown> {
   const { store, peers } = ctx;
   const key = `${r.method} ${r.path}`;
   if (r.method === 'POST' && r.path.startsWith('/api/tools/')) {
@@ -209,7 +225,8 @@ function route(ctx: DaemonContext, r: Req): unknown {
     // Optional idempotency key for writes (MCP adapter sets it before dispatch so retries/drafts can't duplicate).
     const rawKey = r.clientId;
     const clientId = typeof rawKey === 'string' && /^[A-Za-z0-9:_.-]{8,100}$/.test(rawKey) ? rawKey : undefined;
-    return runTool(name, r.body, { store, sync: ctx.sync, session: r.session, sessionKind: KIND_BY_CLIENT[r.client], origin: ORIGIN_BY_CLIENT[r.client], clientId }).result;
+    const call = { store, sync: ctx.sync, session: r.session, sessionKind: KIND_BY_CLIENT[r.client], origin: ORIGIN_BY_CLIENT[r.client], clientId, peers, signal: r.signal };
+    return runToolAsync(name, r.body, call).then((o) => o.result);
   }
   switch (key) {
     case 'GET /api/status':
@@ -217,7 +234,7 @@ function route(ctx: DaemonContext, r: Req): unknown {
     case 'GET /api/state':
       return dashboardState(ctx);
     case 'GET /api/unread':
-      return unread(ctx, r.query.get('session') || r.session, r.query.get('markNotified') === '1');
+      return unread(ctx, r.query.get('session') || r.session, r.query.get('markNotified') === '1', r.query.get('agent') ?? undefined);
     case 'GET /api/verify': {
       // Used by `catalyst doctor`: projection reproducibility + fork alarms.
       return { projection: store.verifyProjection(), forks: store.getState().forks };
@@ -226,16 +243,25 @@ function route(ctx: DaemonContext, r: Req): unknown {
       const body = parse(appendRequestSchema, r.body);
       const v = validatePayload(body.type, body.payload);
       if (!v.ok) throw badRequest(`Invalid ${body.type} payload: ${v.error}`);
+      const origin = body.origin ?? ORIGIN_BY_CLIENT[r.client];
+      const agent = agentKeyFromId(r.agentId);
+      const session = agentSession(r.session, agent);
+      if (agent !== LEAD_AGENT && !(body.clientId && store.findByClientId(body.clientId))) ensureRegistered(store, { agent }, origin, session);
       return store.append({
         type: body.type,
         payload: body.payload,
         refs: body.refs,
         supersedes: body.supersedes,
-        origin: body.origin ?? ORIGIN_BY_CLIENT[r.client],
-        session: r.session,
+        origin,
+        session,
+        agent,
         clientId: body.clientId,
       });
     }
+    case 'POST /api/agents':
+      return registerAgent(ctx, parse(agentRegisterRequestSchema, r.body), r);
+    case 'POST /api/agents/stop':
+      return stopAgent(ctx, parse(agentStopRequestSchema, r.body), r);
     case 'POST /api/sessions': {
       const body = parse(sessionRequestSchema, r.body);
       const claudePid = body.claudePid ?? r.clientPid;
@@ -294,16 +320,19 @@ function mtimeIso(path: string): string | undefined {
 
 function status(ctx: DaemonContext): StatusResponse {
   const { store, paths } = ctx;
+  const state = store.getState();
   return {
     health: ctx.health(),
     dataDir: paths.dataDir,
     projectDir: paths.projectDir,
     sync: ctx.sync(),
-    counts: { ...store.counts(), conflicts: store.getState().conflicts.length, forks: store.getState().forks.length },
+    counts: { ...store.counts(), conflicts: state.conflicts.length, forks: state.forks.length },
     sessions: linkSessions(store.listSessions()),
     inbox: inboxCounts(paths),
     snapshot: { path: paths.snapshotMd, ...optional('generatedAt', mtimeIso(paths.snapshotMd)) },
     handover: { path: paths.handover, ...optional('generatedAt', mtimeIso(paths.handover)) },
+    agents: state.agents,
+    queue: summarizeQueue(state),
   };
 }
 
@@ -335,19 +364,26 @@ function dashboardState(ctx: DaemonContext): DashboardState {
   };
 }
 
-function unread(ctx: DaemonContext, session: string, markNotified: boolean): UnreadSummary {
+/** Counts for one agent of mine (default lead): its own events are excluded, its sibling agents' are not. */
+function unread(ctx: DaemonContext, session: string, markNotified: boolean, rawAgent?: string): UnreadSummary {
   const { store } = ctx;
   const me = store.me;
+  const agent = rawAgent && ID_PATTERNS.agent.test(rawAgent) ? rawAgent : LEAD_AGENT;
+  const address = ownerKey(me, agent);
   const state = store.getState();
-  const noticeKey = `notify:${session}`;
+  const noticeKey = `notify:${agentSession(session, agent)}`;
   const latestCursor = store.latestCursor();
-  const fresh = store.listSince(store.getSessionCursor(noticeKey), { excludeAuthor: me }).filter((e) => MATERIAL_TYPES.has(e.event.type));
+  const fresh = store
+    .listSince(store.getSessionCursor(noticeKey), { excludeAgent: { author: me, agent } })
+    .filter((e) => MATERIAL_TYPES.has(e.event.type) && e.event.type !== 'agent.registered');
   const byType: Record<string, number> = {};
   for (const e of fresh) byType[e.event.type] = (byType[e.event.type] ?? 0) + 1;
-  const questionsForMe = state.questions.filter((q) => !q.answered && q.author !== me && (q.to === undefined || q.to === 'all' || q.to === me)).length;
+  const questionsForMe = state.questions.filter(
+    (q) => !q.answered && !(q.author === me && q.agent === agent) && (q.to === undefined || q.to === 'all' || q.to === me || q.to === address),
+  ).length;
   if (markNotified) store.setSessionCursor(noticeKey, latestCursor);
   return {
-    count: store.counts().unacknowledged,
+    count: store.counts(agent).unacknowledged,
     newSinceLastNotice: fresh.length,
     byType,
     questionsForMe,
@@ -355,6 +391,47 @@ function unread(ctx: DaemonContext, session: string, markNotified: boolean): Unr
     freshness: ctx.sync().freshness,
     latestCursor,
   };
+}
+
+// ---------------------------------------------------------------------------
+// subagent lifecycle (SubagentStart / SubagentStop hooks)
+// ---------------------------------------------------------------------------
+function registerAgent(ctx: DaemonContext, body: z.infer<typeof agentRegisterRequestSchema>, r: Req): AgentRegisterResponse {
+  const { store } = ctx;
+  const agent = agentKeyFromId(body.agentId);
+  const session = agentSession(body.session ?? r.session, agent);
+  const origin = ORIGIN_BY_CLIENT[r.client];
+  if (agent !== LEAD_AGENT) {
+    const prev = latestRegistration(store, agent);
+    const agentType = body.agentType?.trim() || prev?.agentType;
+    if (!prev || !prev.active) {
+      const name = prev?.name ?? defaultAgentName(store.getState(), store.me, agentType);
+      appendRegistration(store, { agent, name, ...(agentType ? { agentType } : {}), active: true, origin, session });
+    }
+  }
+  const view = callerView(store.getState(), store.me, agent);
+  const { text, sourceIds } = agentContext(store, view, ctx.sync(), agent);
+  if (sourceIds.length) store.recordRetrieval(session, sourceIds);
+  return { agent, name: view.name, displayName: view.displayName, context: text };
+}
+
+function stopAgent(ctx: DaemonContext, body: z.infer<typeof agentStopRequestSchema>, r: Req): AgentStopResponse {
+  const { store } = ctx;
+  const agent = agentKeyFromId(body.agentId);
+  if (agent === LEAD_AGENT) return { agent, released: [] };
+  const origin = ORIGIN_BY_CLIENT[r.client];
+  const session = agentSession(r.session, agent);
+  const key = ownerKey(store.me, agent);
+  const released: string[] = [];
+  for (const t of store.getState().tasks) {
+    const mine = t.claims.filter((c) => c.ownerKey === key).map((c) => c.id);
+    if (mine.length === 0 || t.status === 'done') continue;
+    store.append({ type: 'task.released', payload: { taskId: t.taskId, reason: 'agent finished' }, refs: { task: t.taskId }, supersedes: mine, origin, session, agent });
+    released.push(t.taskId);
+  }
+  const prev = latestRegistration(store, agent);
+  if (prev?.active) appendRegistration(store, { agent, name: prev.name, ...(prev.agentType ? { agentType: prev.agentType } : {}), active: false, origin, session });
+  return { agent, released };
 }
 
 function serveStatic(res: ServerResponse, pathname: string): void {

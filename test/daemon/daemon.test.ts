@@ -120,7 +120,7 @@ describe('daemon tools', () => {
     const goal = await api<PublishResult>(info, 'POST', '/api/tools/set_goal', { title: 'Ship login flow', successCriteria: ['tests pass'] });
     expect(goal.status).toBe(200);
     expect(goal.body.text).toContain('Saved locally');
-    expect(goal.body.text).toContain('no peer paired yet');
+    expect(goal.body.text).toContain('no teammate has joined yet');
     expect(goal.body.event.type).toBe('goal.set');
 
     // Simulated peer claims "api-auth" (touching src/api) before us.

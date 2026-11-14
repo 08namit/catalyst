@@ -14,7 +14,7 @@ describe('consumption accounting', () => {
     const seen = new Set<string>();
     let calls = 0;
     for (;;) {
-      const r = getUpdates(a, { limit: 50 }, { session: 's1', sync: syncSummary('connected') });
+      const r = getUpdates(a, { limit: 50 }, { session: 's1', sync: syncSummary('connected'), agent: 'lead' });
       calls++;
       for (const u of r.updates) {
         expect(r.text).toContain(u.id.slice(0, 8)); // every returned record is in the text
@@ -32,9 +32,9 @@ describe('consumption accounting', () => {
     const alpha = b.append({ type: 'progress.reported', payload: { taskId: 'alpha', status: 'done', summary: 'alpha done' }, origin: 'agent' }).event;
     const beta = b.append({ type: 'progress.reported', payload: { taskId: 'beta', status: 'done', summary: 'beta done' }, origin: 'agent' }).event;
     sync(b, a);
-    const r = getUpdates(a, { task: 'alpha' }, { session: 's1', sync: syncSummary('connected') });
+    const r = getUpdates(a, { task: 'alpha' }, { session: 's1', sync: syncSummary('connected'), agent: 'lead' });
     expect(r.updates.map((u) => u.id)).toEqual([alpha.id]);
-    acknowledge(a, {}, { session: 's1', sync: syncSummary('connected') });
+    acknowledge(a, {}, { session: 's1', sync: syncSummary('connected'), agent: 'lead' });
     expect(a.isAcknowledgedByMe(alpha.id)).toBe(true);
     expect(a.isAcknowledgedByMe(beta.id)).toBe(false);
   });

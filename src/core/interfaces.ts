@@ -16,6 +16,8 @@ export interface AppendInput {
   supersedes?: string[];
   origin: Origin;
   session?: string;
+  /** Agent key of the writing agent inside this participant (default LEAD_AGENT; stored only when not lead). */
+  agent?: string;
   /** Idempotency key: appending the same clientId twice returns the first event (duplicate: true). */
   clientId?: string;
 }
@@ -109,8 +111,11 @@ export interface EventStore extends SyncStore, InviteStore {
   getEvent(id: string): StoredEvent | null;
   /** Event previously appended with this idempotency key, if any. */
   findByClientId(clientId: string): StoredEvent | null;
-  /** Events with cursor > since, ascending. */
-  listSince(since: number, opts?: { limit?: number; excludeAuthor?: string; types?: string[] }): StoredEvent[];
+  /**
+   * Events with cursor > since, ascending. `excludeAuthor` drops every event of that participant;
+   * `excludeAgent` drops only events written by that one agent ({author, agent}; lead = events without agent).
+   */
+  listSince(since: number, opts?: { limit?: number; excludeAuthor?: string; excludeAgent?: { author: string; agent: string }; types?: string[] }): StoredEvent[];
   latestCursor(): number;
   /** Deterministic projection (cached; invalidated on every insert). */
   getState(): ProjectState;
@@ -125,7 +130,8 @@ export interface EventStore extends SyncStore, InviteStore {
   retrievedBy(session: string): string[];
   getSessionCursor(session: string): number;
   setSessionCursor(session: string, cursor: number): void;
-  isAcknowledgedByMe(eventId: string): boolean;
+  /** Without `agent`: acknowledged by any of my agents. With `agent`: acknowledged by that agent of mine. */
+  isAcknowledgedByMe(eventId: string, agent?: string): boolean;
   // sessions
   upsertSession(info: { id: string; kind: SessionInfo['kind']; claudePid?: number; retrieved?: boolean; at?: string }): SessionInfo;
   listSessions(): SessionInfo[];
@@ -133,8 +139,26 @@ export interface EventStore extends SyncStore, InviteStore {
   deliveryState(eventId: string): { deliveredTo: Array<{ participant: string; at: string }>; retrievedBy: Array<{ participant: string; at: string }>; acknowledgedBy: Array<{ participant: string; at: string }> };
   peerSessions(peer: string): SessionInfo[];
   parkedCount(): number;
-  counts(): { events: number; ownEvents: number; peerEvents: number; unacknowledged: number };
+  /** `unacknowledged` = peer events not acked by any of my agents (or by `agent` when given). */
+  counts(agent?: string): { events: number; ownEvents: number; peerEvents: number; unacknowledged: number };
   close(): void;
+}
+
+/**
+ * Queue selection (pure, implemented in src/store/queue.ts as `pickNextTask`): the next task `agent` of `me`
+ * should take. Rules, in order:
+ *  1. If `taskId` is given, that task (if it exists and is not done) — even if not ready (reason reports it).
+ *  2. A task this agent already holds a live claim on that is not done (resume).
+ *  3. Otherwise the first task by (assignee === me first, then "any"; order; taskId) that is ready, has no live
+ *     claim by anyone, is not done/abandoned, is not assigned to another participant, and whose paths do not
+ *     overlap any live claim of another agent (pathsOverlap from src/store/paths-match.ts).
+ * `remaining` counts tasks not done; `blocked` lists ready=false tasks waiting on dependencies.
+ */
+export interface QueuePick {
+  task: import('./state.js').TaskView | null;
+  reason: 'requested' | 'resume' | 'next' | 'none_ready' | 'all_done' | 'empty' | 'not_found' | 'already_done';
+  remaining: number;
+  blocked: Array<{ taskId: string; waitingOn: string[] }>;
 }
 
 /** Exported by src/sync/peer.ts. */

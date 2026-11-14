@@ -160,7 +160,7 @@ export class CatalystClient {
     return started.health;
   }
 
-  async request<T>(method: 'GET' | 'POST', path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
+  async request<T>(method: 'GET' | 'POST', path: string, body?: unknown, extraHeaders: Record<string, string> = {}, timeoutMs?: number): Promise<T> {
     if (!this.info) await this.connect();
     const info = this.info!;
     const headers: Record<string, string> = { 'x-catalyst-client': this.opts.client, ...extraHeaders };
@@ -168,7 +168,7 @@ export class CatalystClient {
     if (this.opts.claudePid) headers['x-catalyst-client-pid'] = String(this.opts.claudePid);
     let r: RawResponse;
     try {
-      r = await httpJson(info.apiPort, method, path, { token: info.token, body, timeoutMs: this.opts.timeoutMs, headers });
+      r = await httpJson(info.apiPort, method, path, { token: info.token, body, timeoutMs: timeoutMs ?? this.opts.timeoutMs, headers });
     } catch (err) {
       this.info = null;
       const code = (err as NodeJS.ErrnoException).code;
@@ -184,11 +184,14 @@ export class CatalystClient {
   get<T>(path: string): Promise<T> {
     return this.request<T>('GET', path);
   }
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>('POST', path, body ?? {});
+  post<T>(path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+    return this.request<T>('POST', path, body ?? {}, headers);
   }
-  /** `clientId` is an idempotency key: re-sending the same write with the same key records it once. */
-  tool<T>(name: string, input: unknown, opts: { clientId?: string } = {}): Promise<T> {
-    return this.request<T>('POST', `/api/tools/${name}`, input ?? {}, opts.clientId ? { 'x-catalyst-client-id': opts.clientId } : {});
+  /**
+   * `clientId` is an idempotency key: re-sending the same write with the same key records it once.
+   * `timeoutMs` overrides the client timeout for this call (wait_for_updates long-polls up to 120 s).
+   */
+  tool<T>(name: string, input: unknown, opts: { clientId?: string; timeoutMs?: number } = {}): Promise<T> {
+    return this.request<T>('POST', `/api/tools/${name}`, input ?? {}, opts.clientId ? { 'x-catalyst-client-id': opts.clientId } : {}, opts.timeoutMs);
   }
 }

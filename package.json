@@ -1,7 +1,7 @@
 {
   "name": "catalyst-coord",
-  "version": "0.1.0",
-  "description": "Catalyst: connect two developers' Claude Code sessions with shared goals, tasks, decisions, progress and questions over a direct, encrypted peer link.",
+  "version": "0.2.0",
+  "description": "Catalyst: connect two developers' Claude Code sessions and their subagents with a shared task queue, goals, decisions, progress and questions over a direct, encrypted peer link.",
   "license": "MIT",
   "type": "module",
   "private": true,
@@ -19,6 +19,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-static.mjs",
+    "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:e2e": "npm run build && CATALYST_E2E=1 vitest run test/e2e",

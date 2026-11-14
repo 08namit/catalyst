@@ -7,15 +7,15 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { CatalystClient, DaemonUnavailableError } from '../client/index.js';
 import { createLogger, type Logger } from '../core/log.js';
 import { findProjectDir, projectPaths, type ProjectPaths } from '../core/paths.js';
-import type { Briefing, UnreadSummary } from '../core/api.js';
+import type { AgentRegisterResponse, Briefing, UnreadSummary } from '../core/api.js';
 import { readSnapshotExcerpt, writeInboxDraft } from './fallback.js';
 
-export type HookEvent = 'session-start' | 'user-prompt-submit' | 'post-tool-use' | 'session-end';
+export type HookEvent = 'session-start' | 'user-prompt-submit' | 'pre-tool-use' | 'post-tool-use' | 'subagent-start' | 'subagent-stop' | 'session-end';
 
 /** Subset of the Claude Code hook stdin JSON that Catalyst uses. */
 export interface HookInput {
@@ -28,6 +28,9 @@ export interface HookInput {
   tool_input?: Record<string, unknown>;
   tool_response?: unknown;
   reason?: string;
+  /** Present when the hook fires inside a subagent (absent on the main thread). */
+  agent_id?: string;
+  agent_type?: string;
 }
 
 interface Ctx {
@@ -38,6 +41,8 @@ interface Ctx {
   sessionKey: string;
   /** Session label sent to the daemon. */
   label: string;
+  /** Agent key-safe form of agent_id ('' on the main thread), used in touched-file names. */
+  agentFileKey: string;
 }
 
 const MAX_CONTEXT = 9500;
@@ -51,13 +56,15 @@ export async function runHook(event: string, opts: { dir?: string; input?: HookI
   let log: Logger | null = null;
   try {
     const input = opts.input ?? (await readStdinJson(1000));
+    if (event === 'pre-tool-use') return preToolUse(input); // no project lookup, no daemon: must be fast
     const start = opts.dir ?? process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
     const projectDir = locateProject(start);
     if (!projectDir) return; // not a Catalyst project: stay silent
     const paths = projectPaths(projectDir);
     log = createLogger(paths.hookLog, `hook:${event}`);
     const sessionKey = (input.session_id ?? 'unknown').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80) || 'unknown';
-    const ctx: Ctx = { paths, input, log, sessionKey, label: `claude:${input.session_id ?? 'unknown'}` };
+    const agentFileKey = (input.agent_id ?? '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').slice(0, 64);
+    const ctx: Ctx = { paths, input, log, sessionKey, label: `claude:${input.session_id ?? 'unknown'}`, agentFileKey };
     switch (event) {
       case 'session-start':
         return await sessionStart(ctx);
@@ -65,6 +72,10 @@ export async function runHook(event: string, opts: { dir?: string; input?: HookI
         return await userPromptSubmit(ctx);
       case 'post-tool-use':
         return await postToolUse(ctx);
+      case 'subagent-start':
+        return await subagentStart(ctx);
+      case 'subagent-stop':
+        return await subagentStop(ctx);
       case 'session-end':
         return await sessionEnd(ctx);
       default:
@@ -103,6 +114,70 @@ async function sessionStart(ctx: Ctx): Promise<void> {
     context = `${prefix}${snap}\n\n${PEER_DATA_NOTE}`;
   }
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: truncate(context, MAX_CONTEXT) } }));
+}
+
+// ---------------------------------------------------------------------------
+// pre-tool-use (matcher mcp__catalyst__.*): stamp the caller onto the tool input
+// ---------------------------------------------------------------------------
+/** Tells the daemon which agent is calling: subagents carry agent_id/agent_type; the main thread gets `{}`. */
+export function preToolUseOutput(input: HookInput): Record<string, unknown> | null {
+  if (!(input.tool_name ?? '').startsWith('mcp__catalyst__')) return null;
+  const caller: Record<string, string> = {};
+  if (input.agent_id) caller.agentId = input.agent_id;
+  if (input.agent_type) caller.agentType = input.agent_type;
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'allow',
+      updatedInput: { ...(input.tool_input ?? {}), _caller: caller },
+    },
+  };
+}
+
+function preToolUse(input: HookInput): void {
+  const out = preToolUseOutput(input);
+  if (out) process.stdout.write(JSON.stringify(out));
+}
+
+// ---------------------------------------------------------------------------
+// subagent-start / subagent-stop: register the agent, introduce it, return its claims to the queue
+// ---------------------------------------------------------------------------
+async function subagentStart(ctx: Ctx): Promise<void> {
+  const { input, log } = ctx;
+  if (!input.agent_id) return;
+  try {
+    const client = new CatalystClient(ctx.paths, { client: 'hook', session: ctx.label, timeoutMs: 3000 });
+    await client.connect({ autostart: true, waitMs: 2500 });
+    const r = await client.post<AgentRegisterResponse>('/api/agents', {
+      agentId: input.agent_id.slice(0, 100),
+      ...(input.agent_type ? { agentType: input.agent_type.slice(0, 80) } : {}),
+      session: ctx.label.slice(0, 200),
+    });
+    if (!r?.context) return;
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SubagentStart', additionalContext: truncate(r.context, MAX_CONTEXT) } }));
+    log.info('subagent registered', { agent: r.agent, name: r.name });
+  } catch (err) {
+    log.warn('subagent registration failed', err);
+  }
+}
+
+async function subagentStop(ctx: Ctx): Promise<void> {
+  const { input, log } = ctx;
+  if (!input.agent_id) return;
+  const client = new CatalystClient(ctx.paths, { client: 'hook', session: ctx.label, timeoutMs: 1500 });
+  let up = true;
+  try {
+    await client.connect({ probeTimeoutMs: 300 });
+  } catch {
+    up = false;
+  }
+  await flushTouched(ctx, client, up, touchedFile(ctx), input.agent_id);
+  if (!up) return;
+  try {
+    await client.post('/api/agents/stop', { agentId: input.agent_id.slice(0, 100) });
+  } catch (err) {
+    log.warn('subagent stop failed', err);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +251,7 @@ async function postToolUse(ctx: Ctx): Promise<void> {
       type: 'activity.captured',
       payload: { kind: 'commit', summary: `Commit ${hash.slice(0, 7)}: ${message}`, commits: [{ hash, message }] },
     };
-    await appendOrDraft(ctx, ev, `commit:${hash}`, { probeTimeoutMs: 120, timeoutMs: 150 });
+    await appendOrDraft(ctx, ev, `commit:${hash}`, { probeTimeoutMs: 120, timeoutMs: 150 }, input.agent_id);
     return;
   }
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
@@ -203,10 +278,6 @@ function looksFailed(r: unknown): boolean {
 // ---------------------------------------------------------------------------
 async function sessionEnd(ctx: Ctx): Promise<void> {
   const { paths, log } = ctx;
-  const file = touchedFile(ctx);
-  const touched = existsSync(file)
-    ? [...new Set(readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && l.length <= 300))]
-    : [];
   const client = new CatalystClient(paths, { client: 'hook', session: ctx.label, timeoutMs: 400 });
   let up = true;
   try {
@@ -214,16 +285,33 @@ async function sessionEnd(ctx: Ctx): Promise<void> {
   } catch {
     up = false;
   }
+  await flushTouched(ctx, client, up, join(paths.dataDir, 'sessions', `${ctx.sessionKey}.touched`));
+  // Subagents whose SubagentStop never ran: flush their files under their own agent.
+  const dir = join(paths.dataDir, 'sessions');
+  const prefix = `${ctx.sessionKey}--`;
+  if (existsSync(dir)) {
+    for (const f of readdirSync(dir)) {
+      if (!f.startsWith(prefix) || !f.endsWith('.touched')) continue;
+      await flushTouched(ctx, client, up, join(dir, f), f.slice(prefix.length, -'.touched'.length));
+    }
+  }
+  if (up) await client.post('/api/handover').catch((err: unknown) => log.warn('handover regeneration failed', err));
+}
+
+/** Post one touched-files list as a files activity (as `agentId` when given), or draft it; then delete the list. */
+async function flushTouched(ctx: Ctx, client: CatalystClient, up: boolean, file: string, agentId?: string): Promise<void> {
+  if (!existsSync(file)) return;
+  const touched = [...new Set(readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && l.length <= 300))];
   if (touched.length) {
     const n = touched.length;
     const digest = createHash('sha256').update(touched.join('\n')).digest('hex').slice(0, 16);
-    const ev = { type: 'activity.captured', payload: { kind: 'files', summary: `Session touched ${n} files`, paths: touched.slice(0, 50) } };
-    const clientId = `files:${ctx.sessionKey.slice(0, 50)}:${n}:${digest}`;
-    const saved = up ? await post(client, log, ev, clientId) : false;
-    if (!saved) writeInboxDraft(paths, { catalystDraft: 1, clientId, event: ev, writtenAt: new Date().toISOString() });
-    rmSync(file, { force: true });
+    const who = agentId ? 'Agent' : 'Session';
+    const ev = { type: 'activity.captured', payload: { kind: 'files', summary: `${who} touched ${n} files`, paths: touched.slice(0, 50) } };
+    const clientId = `files:${ctx.sessionKey.slice(0, 50)}${agentId ? `:${agentId.slice(0, 30)}` : ''}:${n}:${digest}`.slice(0, 100);
+    const saved = up ? await post(client, ctx.log, ev, clientId, agentId) : false;
+    if (!saved) writeInboxDraft(ctx.paths, { catalystDraft: 1, clientId, event: ev, writtenAt: new Date().toISOString() });
   }
-  if (up) await client.post('/api/handover').catch((err: unknown) => log.warn('handover regeneration failed', err));
+  rmSync(file, { force: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +320,7 @@ async function sessionEnd(ctx: Ctx): Promise<void> {
 type ActivityEvent = { type: string; payload: Record<string, unknown> };
 
 /** POST /api/events; on daemon-down write an inbox draft. */
-async function appendOrDraft(ctx: Ctx, ev: ActivityEvent, clientId: string, t: { probeTimeoutMs: number; timeoutMs: number }): Promise<void> {
+async function appendOrDraft(ctx: Ctx, ev: ActivityEvent, clientId: string, t: { probeTimeoutMs: number; timeoutMs: number }, agentId?: string): Promise<void> {
   const client = new CatalystClient(ctx.paths, { client: 'hook', session: ctx.label, timeoutMs: t.timeoutMs });
   let up = true;
   try {
@@ -240,15 +328,16 @@ async function appendOrDraft(ctx: Ctx, ev: ActivityEvent, clientId: string, t: {
   } catch {
     up = false;
   }
-  if (up && (await post(client, ctx.log, ev, clientId))) return;
+  if (up && (await post(client, ctx.log, ev, clientId, agentId))) return;
   const f = writeInboxDraft(ctx.paths, { catalystDraft: 1, clientId, event: ev, writtenAt: new Date().toISOString() });
   ctx.log.info('daemon unavailable; wrote inbox draft', { file: f });
 }
 
 /** True if saved (or rejected by the daemon — a draft would be rejected too). False only if the daemon is unreachable. */
-async function post(client: CatalystClient, log: Logger, ev: ActivityEvent, clientId: string): Promise<boolean> {
+async function post(client: CatalystClient, log: Logger, ev: ActivityEvent, clientId: string, agentId?: string): Promise<boolean> {
   try {
-    await client.post('/api/events', { ...ev, origin: 'hook', clientId });
+    // A subagent's activity carries its agent via a header (appendRequestSchema has no agent field).
+    await client.post('/api/events', { ...ev, origin: 'hook', clientId }, agentId ? { 'x-catalyst-agent': agentId.slice(0, 100) } : {});
     return true;
   } catch (err) {
     log.warn('append failed', err);
@@ -256,8 +345,9 @@ async function post(client: CatalystClient, log: Logger, ev: ActivityEvent, clie
   }
 }
 
+/** Per Claude session, and per subagent inside it. */
 function touchedFile(ctx: Ctx): string {
-  return join(ctx.paths.dataDir, 'sessions', `${ctx.sessionKey}.touched`);
+  return join(ctx.paths.dataDir, 'sessions', ctx.agentFileKey ? `${ctx.sessionKey}--${ctx.agentFileKey}.touched` : `${ctx.sessionKey}.touched`);
 }
 
 /** findProjectDir(dir) only checks `dir` itself; walk up from it. */

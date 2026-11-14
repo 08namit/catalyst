@@ -5,8 +5,11 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  LEAD_AGENT,
   PROTOCOL_VERSION,
+  agentOf,
   canonicalJson,
+  ownerKey,
   participantIdFromPublicKey,
   sanitizeForContext,
   signEvent,
@@ -41,6 +44,7 @@ export { project } from './projections.js';
 export { buildBriefing } from './briefing.js';
 export { getUpdates, acknowledge } from './updates.js';
 export { pathsOverlap } from './paths-match.js';
+export { pickNextTask, summarizeQueue } from './queue.js';
 export { summarizeEvent } from './text.js';
 
 const STATUS_RETRIEVAL_CAP = 200;
@@ -141,9 +145,9 @@ export class SqliteEventStore implements EventStore {
   private insertEvent(e: CatalystEvent, source: string, clientId: string | null): number {
     const r = this.db
       .prepare(
-        'INSERT INTO events (id, author, seq, lc, type, ts, json, source, received_at, client_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO events (id, author, agent, seq, lc, type, ts, json, source, received_at, client_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
-      .run(e.id, e.author, e.seq, e.lc, e.type, e.ts, JSON.stringify(e), source, this.nowIso(), clientId);
+      .run(e.id, e.author, agentOf(e), e.seq, e.lc, e.type, e.ts, JSON.stringify(e), source, this.nowIso(), clientId);
     const cursor = Number(r.lastInsertRowid);
     this.db.prepare('INSERT INTO events_fts (rowid, id, text) VALUES (?, ?, ?)').run(cursor, e.id, ftsText(e));
     if (e.v <= PROTOCOL_VERSION) {
@@ -155,8 +159,8 @@ export class SqliteEventStore implements EventStore {
           )
           .run(e.author, p.name, p.publicKey, 'event');
       } else if (e.type === 'ack.recorded') {
-        const ins = this.db.prepare('INSERT OR IGNORE INTO acks (event_id, participant, at, ack_id) VALUES (?, ?, ?, ?)');
-        for (const id of (e.payload as PayloadOf<'ack.recorded'>).eventIds) ins.run(id, e.author, e.ts, e.id);
+        const ins = this.db.prepare('INSERT OR IGNORE INTO acks (event_id, participant, agent, at, ack_id) VALUES (?, ?, ?, ?, ?)');
+        for (const id of (e.payload as PayloadOf<'ack.recorded'>).eventIds) ins.run(id, e.author, agentOf(e), e.ts, e.id);
       }
     }
     this.cached = null;
@@ -189,6 +193,9 @@ export class SqliteEventStore implements EventStore {
       }
       const valid = validatePayload(input.type, input.payload);
       if (!valid.ok) throw new Error(`Invalid ${input.type} payload: ${valid.error}. Fix the listed fields and retry.`);
+      const agent = input.agent ?? LEAD_AGENT;
+      const agentError = agentRegistrationError(input.type, input.payload, agent);
+      if (agentError) throw new Error(agentError);
 
       const refs: EventRefs = { ...(input.refs ?? {}) };
       const p = input.payload as Record<string, unknown>;
@@ -199,7 +206,7 @@ export class SqliteEventStore implements EventStore {
         if (c.scope === 'decision') refs.topic ??= c.key;
         if (c.scope === 'claim') refs.task ??= c.key;
       }
-      const supersedes = input.supersedes && input.supersedes.length > 0 ? input.supersedes : this.defaultSupersedes(input);
+      const supersedes = input.supersedes && input.supersedes.length > 0 ? input.supersedes : this.defaultSupersedes(input, agent);
 
       const body: UnsignedEvent = {
         v: PROTOCOL_VERSION,
@@ -215,6 +222,7 @@ export class SqliteEventStore implements EventStore {
         origin: input.origin,
       };
       if (input.session !== undefined) body.session = input.session;
+      if (agent !== LEAD_AGENT) body.agent = agent;
       const event = signEvent(body, this.identity.privateKey);
       const check = validateEnvelope(event);
       if (!check.ok) throw new Error(`Invalid ${input.type} event: ${check.error}`);
@@ -225,25 +233,34 @@ export class SqliteEventStore implements EventStore {
     return result;
   }
 
-  private defaultSupersedes(input: AppendInput): string[] {
+  /**
+   * Per-agent defaults: a decision revises only the writer's own heads on the topic (another agent's head stays,
+   * so concurrent agents surface as a conflict); a claim/release supersedes only the writer agent's own claims.
+   */
+  private defaultSupersedes(input: AppendInput, agent: string): string[] {
     const state = this.getState();
     const p = input.payload as Record<string, unknown>;
-    const topicHeads = (topic: unknown) => state.decisions.find((d) => d.topic === topic)?.heads.map((h) => h.id) ?? [];
+    const mine = ownerKey(this.me, agent);
+    const topicHeads = (topic: unknown, mineOnly: boolean) =>
+      state.decisions
+        .find((d) => d.topic === topic)
+        ?.heads.filter((h) => !mineOnly || ownerKey(h.author, h.agent) === mine)
+        .map((h) => h.id) ?? [];
     const claimHeads = (taskId: unknown, mineOnly: boolean) =>
       state.tasks
         .find((t) => t.taskId === taskId)
-        ?.claims.filter((c) => !mineOnly || c.owner === this.me)
+        ?.claims.filter((c) => !mineOnly || c.ownerKey === mine)
         .map((c) => c.id) ?? [];
     switch (input.type) {
       case 'decision.recorded':
-        return topicHeads(p.topic);
+        return topicHeads(p.topic, true);
       case 'task.claimed':
       case 'task.released':
         return claimHeads(p.taskId, true);
       case 'goal.set':
         return state.goal.heads.map((g) => g.id);
       case 'conflict.resolved':
-        if (p.scope === 'decision') return topicHeads(p.key);
+        if (p.scope === 'decision') return topicHeads(p.key, false);
         if (p.scope === 'claim') return claimHeads(p.key, false);
         return state.goal.heads.map((g) => g.id);
       default:
@@ -309,6 +326,11 @@ export class SqliteEventStore implements EventStore {
       return null;
     }
     const e = v.event;
+    const agentError = e.v <= PROTOCOL_VERSION ? agentRegistrationError(e.type, e.payload, agentOf(e)) : null;
+    if (agentError) {
+      result.rejected.push({ id: e.id, reason: agentError });
+      return null;
+    }
     if (e.project !== this.projectId) {
       result.rejected.push({ id: e.id, reason: `wrong project: event belongs to ${e.project}, this node is ${this.projectId}` });
       return null;
@@ -533,12 +555,19 @@ export class SqliteEventStore implements EventStore {
     return r ? this.toStored(r) : null;
   }
 
-  listSince(since: number, opts: { limit?: number; excludeAuthor?: string; types?: string[] } = {}): StoredEvent[] {
+  listSince(
+    since: number,
+    opts: { limit?: number; excludeAuthor?: string; excludeAgent?: { author: string; agent: string }; types?: string[] } = {},
+  ): StoredEvent[] {
     let sql = 'SELECT * FROM events WHERE cursor > ?';
     const params: Array<string | number> = [since];
     if (opts.excludeAuthor !== undefined) {
       sql += ' AND author != ?';
       params.push(opts.excludeAuthor);
+    }
+    if (opts.excludeAgent !== undefined) {
+      sql += ' AND NOT (author = ? AND agent = ?)';
+      params.push(opts.excludeAgent.author, opts.excludeAgent.agent);
     }
     if (opts.types && opts.types.length > 0) {
       sql += ` AND type IN (${opts.types.map(() => '?').join(',')})`;
@@ -593,6 +622,14 @@ export class SqliteEventStore implements EventStore {
     }
   }
 
+  /** Display name for (participant, agent): "Tiam" for the lead, "Tiam / api" for a subagent. */
+  private displayName(participant: string, agent: string = LEAD_AGENT): string {
+    const view = this.getState().agents.find((a) => a.participant === participant && a.agent === agent);
+    if (view) return view.displayName;
+    return agent === LEAD_AGENT ? this.nameOf(participant) : `${this.nameOf(participant)} / ${agent.slice(0, 8)}`;
+  }
+
+  /** `acknowledgedByMe` is participant-level (any of my agents); agent-aware callers override it. */
   toUpdateItem(s: StoredEvent): UpdateItem {
     const e = s.event;
     return {
@@ -602,10 +639,12 @@ export class SqliteEventStore implements EventStore {
       seq: e.seq,
       ts: e.ts,
       origin: e.origin,
+      agent: agentOf(e),
+      agentName: this.displayName(e.author, agentOf(e)),
       cursor: s.cursor,
       type: e.type,
       refs: e.refs,
-      summary: sanitizeForContext(summarizeEvent(e), 300),
+      summary: sanitizeForContext(summarizeEvent(e, (p, a) => this.displayName(p, a)), 300),
       acknowledgedByMe: this.isAcknowledgedByMe(e.id),
     };
   }
@@ -636,8 +675,9 @@ export class SqliteEventStore implements EventStore {
       .run(session, cursor);
   }
 
-  isAcknowledgedByMe(eventId: string): boolean {
-    return this.db.prepare('SELECT 1 AS x FROM acks WHERE event_id = ? AND participant = ?').get(eventId, this.me) !== undefined;
+  isAcknowledgedByMe(eventId: string, agent?: string): boolean {
+    if (agent === undefined) return this.db.prepare('SELECT 1 AS x FROM acks WHERE event_id = ? AND participant = ?').get(eventId, this.me) !== undefined;
+    return this.db.prepare('SELECT 1 AS x FROM acks WHERE event_id = ? AND participant = ? AND agent = ?').get(eventId, this.me, agent) !== undefined;
   }
 
   upsertSession(info: { id: string; kind: SessionInfo['kind']; claudePid?: number; retrieved?: boolean; at?: string }): SessionInfo {
@@ -685,7 +725,7 @@ export class SqliteEventStore implements EventStore {
     return {
       deliveredTo: rows('SELECT peer AS p, at FROM deliveries WHERE event_id = ? ORDER BY at, peer'),
       retrievedBy: rows('SELECT participant AS p, at FROM remote_retrievals WHERE event_id = ? ORDER BY at, participant'),
-      acknowledgedBy: rows('SELECT participant AS p, at FROM acks WHERE event_id = ? ORDER BY at, participant'),
+      acknowledgedBy: rows('SELECT participant AS p, MIN(at) AS at FROM acks WHERE event_id = ? GROUP BY participant ORDER BY at, participant'),
     };
   }
 
@@ -708,16 +748,29 @@ export class SqliteEventStore implements EventStore {
       .map((r) => this.toStored(r));
   }
 
-  counts(): { events: number; ownEvents: number; peerEvents: number; unacknowledged: number } {
+  /**
+   * Without `agent`: unacknowledged = peer events not acked by any of my agents. With `agent`: events not written
+   * by that agent (peers' and sibling agents') that it has not acked — the same "unread" as its briefing.
+   */
+  counts(agent?: string): { events: number; ownEvents: number; peerEvents: number; unacknowledged: number } {
     return {
       events: this.count('SELECT COUNT(*) AS n FROM events'),
       ownEvents: this.count('SELECT COUNT(*) AS n FROM events WHERE author = ?', this.me),
       peerEvents: this.count('SELECT COUNT(*) AS n FROM events WHERE author != ?', this.me),
-      unacknowledged: this.count(
-        "SELECT COUNT(*) AS n FROM events e WHERE e.author != ? AND e.type != 'ack.recorded' AND NOT EXISTS (SELECT 1 FROM acks a WHERE a.event_id = e.id AND a.participant = ?)",
-        this.me,
-        this.me,
-      ),
+      unacknowledged:
+        agent === undefined
+          ? this.count(
+              "SELECT COUNT(*) AS n FROM events e WHERE e.author != ? AND e.type != 'ack.recorded' AND NOT EXISTS (SELECT 1 FROM acks a WHERE a.event_id = e.id AND a.participant = ?)",
+              this.me,
+              this.me,
+            )
+          : this.count(
+              "SELECT COUNT(*) AS n FROM events e WHERE NOT (e.author = ? AND e.agent = ?) AND e.type != 'ack.recorded' AND NOT EXISTS (SELECT 1 FROM acks a WHERE a.event_id = e.id AND a.participant = ? AND a.agent = ?)",
+              this.me,
+              agent,
+              this.me,
+              agent,
+            ),
     };
   }
 
@@ -725,6 +778,13 @@ export class SqliteEventStore implements EventStore {
     this.listeners.clear();
     if (this.db.isOpen) this.db.close();
   }
+}
+
+/** agent.registered names the writing agent itself: its payload.agent must equal the event's agent. */
+function agentRegistrationError(type: string, payload: unknown, agent: string): string | null {
+  if (type !== 'agent.registered') return null;
+  const claimed = (payload as { agent?: unknown }).agent;
+  return claimed === agent ? null : `agent.registered payload.agent (${String(claimed)}) must equal the event's agent (${agent})`;
 }
 
 function rawId(raw: unknown): string | undefined {

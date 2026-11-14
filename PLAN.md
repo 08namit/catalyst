@@ -159,3 +159,21 @@ Each agent reports changed files, assumptions, checks run and open issues.
 
 Not verified live: interactive Claude Code sessions (MCP approval / trust dialog), UserPromptSubmit notice inside a
 live session (covered by e2e with the real hook binary), two physical laptops (procedure in DEMO.md part C).
+
+## v0.2 status (2026-11-14) — named subagents, shared task queue, talk-to-Claude setup
+
+Plan: one Claude session per developer spawns subagents; each subagent is a named agent ("Tiam / api") with its
+own claims, decisions, acks and unread; a shared task queue spans both laptops; setup happens by talking to Claude.
+
+| Step | Owner | Status | Verification |
+|---|---|---|---|
+| 0. Spike: PreToolUse `updatedInput` reaches an MCP tool from a subagent; SubagentStart `additionalContext` | lead | done | headless `claude -p` (Claude Code 2.1.325) |
+| 1. Frozen contracts: protocol v2 (`agent` field, `agent.registered`, queue fields, agent addresses), api (`_caller`, new tools), state | lead | done | typecheck |
+| 2a. Store: per-agent heads/claims/progress/acks/unread, `pickNextTask`, `summarizeQueue`, handover agents/queue | Claude subagent | done | `test/store`, `test/handover` |
+| 2b. Daemon/MCP/hooks/setup: caller→agent, new tools, `wait_for_updates`, `/api/agents`, PreToolUse/SubagentStart/SubagentStop hooks, `src/setup/project.ts`, no-project MCP setup tools | Claude subagent | done | `test/daemon`, `test/mcp`, `test/hooks`, `test/setup` |
+| 2c. `catalyst install`, no-arg status, CLI on project.ts, dashboard agents/queue, README/DEMO/PROTOCOL | Claude subagent | done | `test/cli`, `test/dashboard` |
+| 3. Integration + e2e | lead | done | `npm test` 186, `npm run test:e2e` 25 (new `test/e2e/multi-agent.test.ts`, 8 scenarios), `scripts/two-node-demo.sh` exit 0 |
+| Live: two headless lead sessions (one per checkout), each spawning 2 subagents, building the notes app from a posted queue | lead | done | 3/3 tasks done across both nodes, correct agent names on both sides, 0 conflicts, merged code: 14 tests pass, CLI works; 0 human prompts after the first |
+
+Not verified yet: interactive sessions (MCP approval, trust dialog, hooks after restart), `catalyst install` against
+a real user config, `start_project`/`join_project` driven by a real Claude session, two physical laptops.
