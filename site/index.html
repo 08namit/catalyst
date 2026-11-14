@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Set up Catalyst</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="copy.js" defer></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="brand"><span class="mark" aria-hidden="true"></span>Catalyst</p>
+      <h1>Link two developers’ Claude Code sessions</h1>
+      <p class="lede">Each developer runs a small per-project daemon. It keeps a signed, append-only event log and syncs it directly with the other laptop over an encrypted LAN connection. Shared goals, tasks, decisions, progress and questions reach the other developer’s Claude Code session through MCP tools and hooks, including when the two sessions run hours apart.</p>
+      <p class="notice"><strong>Install from source.</strong> Catalyst is not published to npm. Every command below runs from a clone of the repository.</p>
+      <nav class="toc" aria-label="Contents">
+        <a href="#prereq">Prerequisites</a><a href="#install">Install</a><a href="#pair">Pair a project</a><a href="#claude">Use with Claude Code</a><a href="#check">Check status</a><a href="#outage">Demo an outage</a><a href="#network">Network</a><a href="#trust">Trust model</a><a href="#uninstall">Uninstall</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="prereq">
+      <h2><span class="n">1</span>Prerequisites (both laptops)</h2>
+      <ul>
+        <li><strong>Node.js ≥ 22.13</strong> (24 LTS recommended). Check with <code>node --version</code>.</li>
+        <li><strong>git</strong></li>
+        <li><strong>Claude Code</strong> (the <code>claude</code> command)</li>
+        <li>Both laptops on the <strong>same LAN</strong>, able to reach each other over TCP.</li>
+      </ul>
+    </section>
+
+    <section id="install">
+      <h2><span class="n">2</span>Install from source (both laptops)</h2>
+      <pre class="cmd"><code>git clone &lt;YOUR-CATALYST-REPO-URL&gt; catalyst</code></pre>
+      <p class="placeholder"><code>&lt;YOUR-CATALYST-REPO-URL&gt;</code> is a placeholder. Replace it with the URL of your Catalyst repository or fork.</p>
+      <pre class="cmd"><code>cd catalyst &amp;&amp; npm install &amp;&amp; npm run build &amp;&amp; npm link</code></pre>
+      <p><code>npm link</code> puts the <code>catalyst</code> command on your PATH. To remove it later, run <code>npm unlink -g catalyst-coord</code>.</p>
+    </section>
+
+    <section id="pair">
+      <h2><span class="n">3</span>Pair a project</h2>
+      <p>Each developer works in their own clone of the <em>project</em> (not of Catalyst). Each checkout counts as one participant.</p>
+      <div class="two">
+        <div class="role">
+          <h3>Developer A <span class="muted">(e.g. Tiam)</span></h3>
+          <pre class="cmd"><code>cd your-project
+catalyst init --name "Tiam"</code></pre>
+          <pre class="cmd"><code>catalyst pair</code></pre>
+          <p>This prints a <strong>single-use invite</strong>, valid for 15 minutes, that includes this laptop’s LAN addresses. Send it to Developer B over a channel you trust.</p>
+          <p class="small">If the advertised address is wrong (VPN, several network interfaces), choose one with <code>catalyst pair --host &lt;ip&gt;</code>.</p>
+        </div>
+        <div class="role">
+          <h3>Developer B <span class="muted">(e.g. Namit)</span></h3>
+          <pre class="cmd"><code>cd their-clone
+catalyst join cat1_… --name "Namit"</code></pre>
+          <p>Paste the full <code>cat1_…</code> invite printed by <code>catalyst pair</code>.</p>
+          <p>Then, <strong>on both laptops</strong>:</p>
+          <pre class="cmd"><code>catalyst status</code></pre>
+          <p>Compare the <strong>confirmation codes</strong> out loud or in chat. If they differ, stop: you are not connected to each other.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="claude">
+      <h2><span class="n">4</span>Use it from Claude Code</h2>
+      <pre class="cmd"><code>claude</code></pre>
+      <p>Start Claude Code inside the project. When Claude Code asks, <strong>approve the project MCP server named “catalyst”</strong>. The hooks then give each session a briefing when it starts, a one-line notice when the peer has published new updates, and an automatic record of commits and edits. The agent uses Catalyst tools to claim tasks, publish decisions and progress, and ask or answer questions.</p>
+    </section>
+
+    <section id="check">
+      <h2><span class="n">5</span>Check status</h2>
+      <div class="cmds">
+        <div><pre class="cmd"><code>catalyst status</code></pre><p>Shows the peer state (connected, unreachable, paused), the last sync, pending outbound events, sessions and the confirmation code.</p></div>
+        <div><pre class="cmd"><code>catalyst doctor</code></pre><p>Diagnoses common setup problems, such as the daemon, ports and the Claude Code integration, and suggests fixes.</p></div>
+        <div><pre class="cmd"><code>catalyst dashboard</code></pre><p>Opens the local dashboard in your browser. It is served only on 127.0.0.1 and receives a one-time token in the URL.</p></div>
+      </div>
+    </section>
+
+    <section id="outage">
+      <h2><span class="n">6</span>Demo an outage</h2>
+      <pre class="cmd"><code>catalyst peer pause</code></pre>
+      <p>This stops peer networking only. Both sessions keep working, and new events are saved locally and queued.</p>
+      <pre class="cmd"><code>catalyst peer resume</code></pre>
+      <p>On reconnect, the missed events are replayed in order. <code>catalyst status</code> shows the queue draining.</p>
+    </section>
+
+    <section id="network">
+      <h2>Network &amp; firewall</h2>
+      <ul>
+        <li>Allow <strong>inbound TCP on the peer port</strong> shown by <code>catalyst status</code>. On macOS, allow incoming connections for <code>node</code> when prompted.</li>
+        <li>Both laptops must be on the <strong>same LAN</strong> or otherwise able to reach each other directly. Catalyst has <strong>no NAT traversal and no relay</strong>.</li>
+        <li>The local API and the dashboard listen on <code>127.0.0.1</code> only.</li>
+      </ul>
+    </section>
+
+    <section id="trust">
+      <h2>Trust model</h2>
+      <dl class="trust">
+        <dt>Invite</dt><dd>The <code>cat1_…</code> invite is a <strong>bearer secret for 15 minutes</strong>. Anyone holding it can pair once. It is single-use and stored hashed.</dd>
+        <dt>Transport</dt><dd><strong>TLS 1.2 with a pre-shared key</strong> (ECDHE-PSK, which gives forward secrecy), using a key derived for this pair and this project. Unknown identities are rejected.</dd>
+        <dt>Events</dt><dd>Every event is <strong>Ed25519-signed</strong> by its author and content-addressed by its SHA-256 hash. Tampered or forked events are detected.</dd>
+        <dt>Local access</dt><dd>The dashboard and API are <strong>loopback only</strong>. They require a per-start bearer token and enforce Host/Origin checks.</dd>
+        <dt>Limits</dt><dd>Task ownership is advisory, and conflicts are flagged rather than auto-resolved. Each developer still uses their own Claude model access.</dd>
+      </dl>
+    </section>
+
+    <section id="uninstall">
+      <h2>Uninstall</h2>
+      <p>Run these in each project:</p>
+      <pre class="cmd"><code>catalyst uninstall claude</code></pre>
+      <p class="small">Removes the Catalyst MCP server, hooks and CLAUDE.md block from the project and keeps your other settings.</p>
+      <pre class="cmd"><code>catalyst stop</code></pre>
+      <pre class="cmd"><code>rm -rf .catalyst</code></pre>
+      <p class="small">Deletes this project’s local event log, identity and keys. This cannot be undone.</p>
+      <p>To remove the CLI itself: <code>npm unlink -g catalyst-coord</code>, then delete the <code>catalyst</code> clone.</p>
+    </section>
+  </main>
+  <footer class="wrap foot">Catalyst · MIT licensed · This page works offline.</footer>
+</body>
+</html>

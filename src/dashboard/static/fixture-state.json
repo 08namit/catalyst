@@ -1,0 +1,1687 @@
+{
+  "generatedAt": "2026-11-14T16:42:10.000Z",
+  "health": {
+    "ok": true,
+    "projectId": "prj_93f52560651f33d53c9518ac",
+    "participantId": "p_4c2dbbafa3e4534493cac8ff",
+    "name": "Tiam",
+    "nonce": "78377b525757b494427f89014f97d799",
+    "pid": 48213,
+    "version": "0.1.0",
+    "protocol": 1,
+    "apiPort": 51723,
+    "peerPort": 47811,
+    "startedAt": "2026-11-14T13:42:10.000Z"
+  },
+  "state": {
+    "project": {
+      "id": "prj_93f52560651f33d53c9518ac",
+      "name": "Pocket Tasks",
+      "description": "Demo app for Catalyst"
+    },
+    "me": "p_4c2dbbafa3e4534493cac8ff",
+    "participants": [
+      {
+        "id": "p_4c2dbbafa3e4534493cac8ff",
+        "name": "Tiam",
+        "publicKey": "c035f8e974c12ed0205c2e739477973de83264af37efe7c2b900552cf172516a",
+        "role": "API (sample/server)",
+        "joinedAt": "2026-11-14T11:42:10.000Z",
+        "isMe": true
+      },
+      {
+        "id": "p_6ae0107a3cc7a824414b71ef",
+        "name": "Namit",
+        "publicKey": "114fd4d459448bdce9c0730918f3ad022b9ffb9ce6d5823d5386ca156769d9a2",
+        "role": "CLI (sample/client)",
+        "joinedAt": "2026-11-14T11:52:10.000Z",
+        "isMe": false
+      }
+    ],
+    "goal": {
+      "current": {
+        "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
+        "author": "p_4c2dbbafa3e4534493cac8ff",
+        "authorName": "Tiam",
+        "seq": 3,
+        "ts": "2026-11-14T12:02:10.000Z",
+        "origin": "agent",
+        "title": "Ship task creation in Pocket Tasks (API + CLI)",
+        "description": "Add POST /tasks to the server and a matching `add` command to the CLI client, agreed through a shared API decision.",
+        "successCriteria": [
+          "POST /tasks creates a task and returns it",
+          "client add \"<title>\" works against the server",
+          "npm test passes on both branches after merge"
+        ]
+      },
+      "heads": [
+        {
+          "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
+          "author": "p_4c2dbbafa3e4534493cac8ff",
+          "authorName": "Tiam",
+          "seq": 3,
+          "ts": "2026-11-14T12:02:10.000Z",
+          "origin": "agent",
+          "title": "Ship task creation in Pocket Tasks (API + CLI)",
+          "description": "Add POST /tasks to the server and a matching `add` command to the CLI client, agreed through a shared API decision.",
+          "successCriteria": [
+            "POST /tasks creates a task and returns it",
+            "client add \"<title>\" works against the server",
+            "npm test passes on both branches after merge"
+          ]
+        }
+      ],
+      "conflict": false
+    },
+    "tasks": [
+      {
+        "taskId": "api-create-task",
+        "title": "POST /tasks endpoint",
+        "description": "Create tasks over HTTP following decision api/create-task.",
+        "paths": [
+          "sample/server/**"
+        ],
+        "createdBy": {
+          "id": "5bbe14e439a6e2f4387e2e408a90b5c95696ca547d9f5a42555b03ba02839e3f",
+          "author": "p_4c2dbbafa3e4534493cac8ff",
+          "authorName": "Tiam",
+          "seq": 4,
+          "ts": "2026-11-14T12:07:10.000Z",
+          "origin": "agent"
+        },
+        "claims": [
+          {
+            "id": "a332d65e094548072ac3c5c2a5c3daf5b409b25dee09c582986b88d8e51d9b34",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 5,
+            "ts": "2026-11-14T12:08:10.000Z",
+            "origin": "agent",
+            "taskId": "api-create-task",
+            "owner": "p_4c2dbbafa3e4534493cac8ff",
+            "ownerName": "Tiam",
+            "scope": "Implement POST /tasks in sample/server",
+            "paths": [
+              "sample/server/**"
+            ],
+            "viaResolution": false
+          }
+        ],
+        "owners": [
+          "p_4c2dbbafa3e4534493cac8ff"
+        ],
+        "latestProgress": [
+          {
+            "id": "35b57a1cda48e54d2e122b46e8669b2bcbdfeb0098ee7e73ee58c86762036ddb",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 10,
+            "ts": "2026-11-14T16:02:10.000Z",
+            "origin": "agent",
+            "taskId": "api-create-task",
+            "status": "in_progress",
+            "summary": "POST /tasks handler written behind the bearer check; validation for title length done.",
+            "blockers": [],
+            "evidence": [
+              "npm test: 3 passed, 1 todo"
+            ],
+            "nextSteps": [
+              "Wait for api/create-task conflict resolution before merging"
+            ],
+            "branch": "tiam/api-create-task",
+            "commit": "4e1c9a7"
+          }
+        ],
+        "status": "in_progress",
+        "openBlockers": [],
+        "claimConflict": false
+      },
+      {
+        "taskId": "client-add-command",
+        "title": "CLI `add` command",
+        "paths": [
+          "sample/client/**"
+        ],
+        "createdBy": {
+          "id": "c06d38800a576ab91caaef0cd35d29170035d481c61f56d40e3c0b4a5ace7644",
+          "author": "p_6ae0107a3cc7a824414b71ef",
+          "authorName": "Namit",
+          "seq": 2,
+          "ts": "2026-11-14T12:22:10.000Z",
+          "origin": "agent"
+        },
+        "claims": [
+          {
+            "id": "0f0627f69759e03bdfb95d5e366d3bb3ebce8fbcd6aea09a8c11a06437ebc2db",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 3,
+            "ts": "2026-11-14T12:23:10.000Z",
+            "origin": "agent",
+            "taskId": "client-add-command",
+            "owner": "p_6ae0107a3cc7a824414b71ef",
+            "ownerName": "Namit",
+            "scope": "Add `add \"<title>\"` command to sample/client",
+            "paths": [
+              "sample/client/**"
+            ],
+            "viaResolution": false
+          }
+        ],
+        "owners": [
+          "p_6ae0107a3cc7a824414b71ef"
+        ],
+        "latestProgress": [
+          {
+            "id": "fc298faedbf349adb0b30dc73710663f9b5a9fe50ed5a247438a4661e58766cb",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 6,
+            "ts": "2026-11-14T16:12:10.000Z",
+            "origin": "agent",
+            "taskId": "client-add-command",
+            "status": "blocked",
+            "summary": "Argument parsing for `add` is done; request format depends on the api/create-task decision.",
+            "blockers": [
+              "api/create-task has two conflicting decisions"
+            ],
+            "evidence": [],
+            "nextSteps": [],
+            "branch": "namit/client-add"
+          }
+        ],
+        "status": "blocked",
+        "openBlockers": [
+          "api/create-task has two conflicting decisions"
+        ],
+        "claimConflict": false
+      },
+      {
+        "taskId": "readme-update",
+        "title": "Document task creation",
+        "paths": [
+          "sample/README.md"
+        ],
+        "createdBy": {
+          "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
+          "author": "p_4c2dbbafa3e4534493cac8ff",
+          "authorName": "Tiam",
+          "seq": 6,
+          "ts": "2026-11-14T14:42:10.000Z",
+          "origin": "agent",
+          "taskId": "readme-update",
+          "owner": "p_4c2dbbafa3e4534493cac8ff",
+          "ownerName": "Tiam",
+          "scope": "Document the new endpoint in sample/README.md",
+          "paths": [
+            "sample/README.md"
+          ],
+          "viaResolution": false
+        },
+        "claims": [
+          {
+            "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 6,
+            "ts": "2026-11-14T14:42:10.000Z",
+            "origin": "agent",
+            "taskId": "readme-update",
+            "owner": "p_4c2dbbafa3e4534493cac8ff",
+            "ownerName": "Tiam",
+            "scope": "Document the new endpoint in sample/README.md",
+            "paths": [
+              "sample/README.md"
+            ],
+            "viaResolution": false
+          },
+          {
+            "id": "51f02fede8506e7acca789c343e60ec1c3f8ccc00d2c4a209d06246a4790bd8e",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 4,
+            "ts": "2026-11-14T14:44:10.000Z",
+            "origin": "agent",
+            "taskId": "readme-update",
+            "owner": "p_6ae0107a3cc7a824414b71ef",
+            "ownerName": "Namit",
+            "scope": "Document the add command in sample/README.md",
+            "paths": [
+              "sample/README.md"
+            ],
+            "viaResolution": false
+          }
+        ],
+        "owners": [
+          "p_4c2dbbafa3e4534493cac8ff",
+          "p_6ae0107a3cc7a824414b71ef"
+        ],
+        "latestProgress": [],
+        "status": "claimed",
+        "openBlockers": [],
+        "claimConflict": true
+      }
+    ],
+    "decisions": [
+      {
+        "topic": "api/create-task",
+        "heads": [
+          {
+            "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 9,
+            "ts": "2026-11-14T15:07:10.000Z",
+            "origin": "agent",
+            "topic": "api/create-task",
+            "title": "POST /tasks takes {title} with a bearer token",
+            "decision": "POST /tasks, body {\"title\": string (1-200 chars)}, header Authorization: Bearer <POCKET_TOKEN>. Responds 201 with the created task {id, title, done:false}.",
+            "rationale": "Matches the existing GET /tasks shape; bearer tokens are what the CLI already reads from env.",
+            "status": "accepted",
+            "codeRefs": [
+              "sample/server/index.js"
+            ],
+            "alternatives": [
+              "X-Api-Key header"
+            ],
+            "supersedes": [],
+            "refs": {
+              "topic": "api/create-task",
+              "task": "api-create-task"
+            }
+          },
+          {
+            "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 5,
+            "ts": "2026-11-14T15:09:10.000Z",
+            "origin": "agent",
+            "topic": "api/create-task",
+            "title": "POST /tasks takes {title, due?} with X-Api-Key",
+            "decision": "POST /tasks, body {\"title\": string, \"due\"?: ISO date}, header X-Api-Key: <key>. Responds 201 with {id}.",
+            "rationale": "The CLI wants to support due dates soon; API keys are simpler to paste.",
+            "status": "proposed",
+            "codeRefs": [],
+            "alternatives": [],
+            "supersedes": [],
+            "refs": {
+              "topic": "api/create-task",
+              "task": "client-add-command"
+            }
+          }
+        ],
+        "history": [
+          {
+            "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 9,
+            "ts": "2026-11-14T15:07:10.000Z",
+            "origin": "agent",
+            "topic": "api/create-task",
+            "title": "POST /tasks takes {title} with a bearer token",
+            "decision": "POST /tasks, body {\"title\": string (1-200 chars)}, header Authorization: Bearer <POCKET_TOKEN>. Responds 201 with the created task {id, title, done:false}.",
+            "rationale": "Matches the existing GET /tasks shape; bearer tokens are what the CLI already reads from env.",
+            "status": "accepted",
+            "codeRefs": [
+              "sample/server/index.js"
+            ],
+            "alternatives": [
+              "X-Api-Key header"
+            ],
+            "supersedes": [],
+            "refs": {
+              "topic": "api/create-task",
+              "task": "api-create-task"
+            }
+          },
+          {
+            "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 5,
+            "ts": "2026-11-14T15:09:10.000Z",
+            "origin": "agent",
+            "topic": "api/create-task",
+            "title": "POST /tasks takes {title, due?} with X-Api-Key",
+            "decision": "POST /tasks, body {\"title\": string, \"due\"?: ISO date}, header X-Api-Key: <key>. Responds 201 with {id}.",
+            "rationale": "The CLI wants to support due dates soon; API keys are simpler to paste.",
+            "status": "proposed",
+            "codeRefs": [],
+            "alternatives": [],
+            "supersedes": [],
+            "refs": {
+              "topic": "api/create-task",
+              "task": "client-add-command"
+            }
+          }
+        ],
+        "conflict": true
+      },
+      {
+        "topic": "server/storage",
+        "heads": [
+          {
+            "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 8,
+            "ts": "2026-11-14T13:22:10.000Z",
+            "origin": "agent",
+            "topic": "server/storage",
+            "title": "In-memory store with incremental ids",
+            "decision": "In-memory array; ids are incrementing integers starting at 1.",
+            "rationale": "Stable ids make CLI output predictable.",
+            "status": "accepted",
+            "codeRefs": [
+              "sample/server/index.js"
+            ],
+            "alternatives": [],
+            "supersedes": [
+              "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe"
+            ],
+            "refs": {
+              "topic": "server/storage"
+            }
+          }
+        ],
+        "history": [
+          {
+            "id": "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 7,
+            "ts": "2026-11-14T12:32:10.000Z",
+            "origin": "agent",
+            "topic": "server/storage",
+            "title": "Keep tasks in memory",
+            "decision": "Tasks stay in an in-memory array for the demo; no persistence.",
+            "rationale": "Keeps the sample dependency-free.",
+            "status": "accepted",
+            "codeRefs": [],
+            "alternatives": [],
+            "supersedes": [],
+            "refs": {
+              "topic": "server/storage"
+            }
+          },
+          {
+            "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 8,
+            "ts": "2026-11-14T13:22:10.000Z",
+            "origin": "agent",
+            "topic": "server/storage",
+            "title": "In-memory store with incremental ids",
+            "decision": "In-memory array; ids are incrementing integers starting at 1.",
+            "rationale": "Stable ids make CLI output predictable.",
+            "status": "accepted",
+            "codeRefs": [
+              "sample/server/index.js"
+            ],
+            "alternatives": [],
+            "supersedes": [
+              "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe"
+            ],
+            "refs": {
+              "topic": "server/storage"
+            }
+          }
+        ],
+        "conflict": false
+      }
+    ],
+    "conflicts": [
+      {
+        "scope": "decision",
+        "key": "api/create-task",
+        "heads": [
+          {
+            "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 9,
+            "ts": "2026-11-14T15:07:10.000Z",
+            "origin": "agent",
+            "summary": "{title} + Authorization: Bearer, 201 returns the task"
+          },
+          {
+            "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 5,
+            "ts": "2026-11-14T15:09:10.000Z",
+            "origin": "agent",
+            "summary": "(proposed) {title, due?} + X-Api-Key, 201 returns {id}"
+          }
+        ],
+        "hint": "Agree on one version, then call resolve_conflict with scope \"decision\" and key \"api/create-task\"."
+      },
+      {
+        "scope": "claim",
+        "key": "readme-update",
+        "heads": [
+          {
+            "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 6,
+            "ts": "2026-11-14T14:42:10.000Z",
+            "origin": "agent",
+            "summary": "claimed: document the new endpoint"
+          },
+          {
+            "id": "51f02fede8506e7acca789c343e60ec1c3f8ccc00d2c4a209d06246a4790bd8e",
+            "author": "p_6ae0107a3cc7a824414b71ef",
+            "authorName": "Namit",
+            "seq": 4,
+            "ts": "2026-11-14T14:44:10.000Z",
+            "origin": "agent",
+            "summary": "claimed: document the add command"
+          }
+        ],
+        "hint": "Decide who owns readme-update, then resolve_conflict with scope \"claim\" and the agreed owner."
+      }
+    ],
+    "questions": [
+      {
+        "id": "1fb70e0e726ae647a48b2b59a4d10ed32ee743d416c26a49e0615c0935d75a80",
+        "author": "p_4c2dbbafa3e4534493cac8ff",
+        "authorName": "Tiam",
+        "seq": 12,
+        "ts": "2026-11-14T16:17:10.000Z",
+        "origin": "agent",
+        "kind": "question",
+        "body": "Can you live with the bearer-token header? I can add `due` later as an optional field.",
+        "to": "p_6ae0107a3cc7a824414b71ef",
+        "refs": {
+          "topic": "api/create-task"
+        },
+        "replies": [],
+        "answered": false
+      },
+      {
+        "id": "438fcf7e5d81fc5e2b36ceb3a000ddb4415d920c2c3e45091f6b085eaae77429",
+        "author": "p_6ae0107a3cc7a824414b71ef",
+        "authorName": "Namit",
+        "seq": 7,
+        "ts": "2026-11-14T15:22:10.000Z",
+        "origin": "agent",
+        "kind": "question",
+        "body": "Should POST /tasks return the whole task or just the id? The CLI prints the created title.",
+        "to": "p_4c2dbbafa3e4534493cac8ff",
+        "refs": {
+          "topic": "api/create-task"
+        },
+        "replies": [
+          {
+            "id": "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0",
+            "author": "p_4c2dbbafa3e4534493cac8ff",
+            "authorName": "Tiam",
+            "seq": 11,
+            "ts": "2026-11-14T15:32:10.000Z",
+            "origin": "agent",
+            "kind": "reply",
+            "body": "Whole task: {id, title, done}. Status 201.",
+            "to": "p_6ae0107a3cc7a824414b71ef",
+            "replyTo": "438fcf7e5d81fc5e2b36ceb3a000ddb4415d920c2c3e45091f6b085eaae77429",
+            "refs": {
+              "topic": "api/create-task"
+            }
+          }
+        ],
+        "answered": true
+      }
+    ],
+    "notifications": [
+      {
+        "id": "14be73c39295e6d6a3ff4c02700963cac89a98ac2b10b68f275bb22d65806b4e",
+        "author": "p_4c2dbbafa3e4534493cac8ff",
+        "authorName": "Tiam",
+        "seq": 17,
+        "ts": "2026-11-14T16:32:10.000Z",
+        "origin": "fallback",
+        "kind": "notification",
+        "body": "Draft imported while the daemon was restarting: README section outline ready.",
+        "refs": {
+          "task": "readme-update"
+        }
+      },
+      {
+        "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
+        "author": "p_4c2dbbafa3e4534493cac8ff",
+        "authorName": "Tiam",
+        "seq": 13,
+        "ts": "2026-11-14T16:27:10.000Z",
+        "origin": "agent",
+        "kind": "notification",
+        "body": "Pushed tiam/api-create-task; tests green locally.",
+        "refs": {
+          "task": "api-create-task"
+        }
+      }
+    ],
+    "issues": [
+      {
+        "id": "7bc17cbe4d921ac0d697a2e6cdb29f7729c522d77a02702c2036d601dbe2771c",
+        "author": "p_6ae0107a3cc7a824414b71ef",
+        "authorName": "Namit",
+        "seq": 8,
+        "ts": "2026-11-14T15:52:10.000Z",
+        "origin": "agent",
+        "kind": "bug",
+        "title": "GET /tasks returns 200 with HTML on unknown routes",
+        "detail": "Unknown paths should return 404 JSON.",
+        "status": "open"
+      },
+      {
+        "id": "379d5eca555470ac2ddddc00e0270e8de55b02d1c74190c0b0953a126462ffbb",
+        "author": "p_4c2dbbafa3e4534493cac8ff",
+        "authorName": "Tiam",
+        "seq": 14,
+        "ts": "2026-11-14T14:12:10.000Z",
+        "origin": "agent",
+        "kind": "risk",
+        "title": "Port 4317 may collide with other local services",
+        "status": "resolved",
+        "resolution": {
+          "id": "0e663ea0e411fd7c55ea93c25d3e7531341abc42d420653151dc6670d19fb9f7",
+          "author": "p_4c2dbbafa3e4534493cac8ff",
+          "authorName": "Tiam",
+          "seq": 15,
+          "ts": "2026-11-14T15:57:10.000Z",
+          "origin": "agent",
+          "note": "Port is configurable via PORT."
+        }
+      }
+    ],
+    "activity": [
+      {
+        "id": "2d10696d0e758405a8000218ec77851d027c920b447cc355541eea494df1e9d3",
+        "author": "p_6ae0107a3cc7a824414b71ef",
+        "authorName": "Namit",
+        "seq": 9,
+        "ts": "2026-11-14T16:14:10.000Z",
+        "origin": "hook",
+        "kind": "files",
+        "summary": "Edited 2 files",
+        "commits": [],
+        "paths": [
+          "sample/client/index.js",
+          "sample/test/client.test.js"
+        ]
+      },
+      {
+        "id": "6ec566bd0f5d393defd053e35b3b940dc4b0a103980b6c4fcbb90bfde316e218",
+        "author": "p_4c2dbbafa3e4534493cac8ff",
+        "authorName": "Tiam",
+        "seq": 16,
+        "ts": "2026-11-14T16:04:10.000Z",
+        "origin": "hook",
+        "kind": "commit",
+        "summary": "Committed 1 change on tiam/api-create-task",
+        "commits": [
+          {
+            "hash": "4e1c9a7",
+            "message": "server: POST /tasks with bearer auth"
+          }
+        ],
+        "paths": [
+          "sample/server/index.js"
+        ]
+      }
+    ],
+    "acknowledgements": {
+      "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0": [
+        "p_6ae0107a3cc7a824414b71ef"
+      ],
+      "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca": [
+        "p_6ae0107a3cc7a824414b71ef"
+      ]
+    },
+    "forks": [],
+    "lastMaterial": {
+      "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 13,
+      "ts": "2026-11-14T16:27:10.000Z",
+      "origin": "agent"
+    },
+    "eventCount": 27,
+    "opaqueCount": 0
+  },
+  "sync": {
+    "paused": false,
+    "peerPort": 47811,
+    "peers": [
+      {
+        "participant": "p_6ae0107a3cc7a824414b71ef",
+        "name": "Namit",
+        "state": "unreachable",
+        "since": "2026-11-14T16:30:10.000Z",
+        "lastSyncAt": "2026-11-14T16:29:40.000Z",
+        "lastError": "connect ECONNREFUSED 192.168.1.42:47811",
+        "addrs": [
+          "192.168.1.42:47811"
+        ],
+        "pendingOutbound": 2,
+        "confirmCode": "K7Q-4MD",
+        "sessions": [
+          {
+            "id": "b1d0c3e2-5f7a-4b8e-9c21-7e3f0a9d6b11",
+            "kind": "hook",
+            "claudePid": 61822,
+            "firstSeenAt": "2026-11-14T12:42:10.000Z",
+            "lastSeenAt": "2026-11-14T16:29:10.000Z",
+            "lastRetrievalAt": "2026-11-14T16:11:10.000Z"
+          },
+          {
+            "id": "mcp-61822",
+            "kind": "mcp",
+            "claudePid": 61822,
+            "linkedSession": "b1d0c3e2-5f7a-4b8e-9c21-7e3f0a9d6b11",
+            "firstSeenAt": "2026-11-14T12:42:10.000Z",
+            "lastSeenAt": "2026-11-14T16:29:10.000Z",
+            "lastRetrievalAt": "2026-11-14T16:13:10.000Z"
+          }
+        ]
+      }
+    ],
+    "pendingOutbound": 2,
+    "parkedEvents": 1,
+    "freshness": "Namit unreachable since 12 min ago (last sync 13 min ago); 2 local updates awaiting delivery. Missing peer updates are not the same as no updates."
+  },
+  "sessions": [
+    {
+      "id": "9a4e2f10-3c6b-4d7e-8f21-0b5c6d7e8f90",
+      "kind": "hook",
+      "claudePid": 48877,
+      "firstSeenAt": "2026-11-14T14:42:10.000Z",
+      "lastSeenAt": "2026-11-14T16:41:10.000Z",
+      "lastRetrievalAt": "2026-11-14T16:40:10.000Z"
+    },
+    {
+      "id": "mcp-48877",
+      "kind": "mcp",
+      "claudePid": 48877,
+      "linkedSession": "9a4e2f10-3c6b-4d7e-8f21-0b5c6d7e8f90",
+      "firstSeenAt": "2026-11-14T14:43:10.000Z",
+      "lastSeenAt": "2026-11-14T16:41:10.000Z",
+      "lastRetrievalAt": "2026-11-14T16:27:10.000Z"
+    },
+    {
+      "id": "cli-tiam",
+      "kind": "cli",
+      "firstSeenAt": "2026-11-14T16:37:10.000Z",
+      "lastSeenAt": "2026-11-14T16:37:10.000Z"
+    }
+  ],
+  "outbound": [
+    {
+      "id": "14be73c39295e6d6a3ff4c02700963cac89a98ac2b10b68f275bb22d65806b4e",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 17,
+      "ts": "2026-11-14T16:32:10.000Z",
+      "origin": "fallback",
+      "cursor": 27,
+      "type": "message.posted",
+      "refs": {
+        "task": "readme-update"
+      },
+      "summary": "Notification from Tiam: Draft imported while the daemon was restarting",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [],
+        "retrievedBy": [],
+        "acknowledgedBy": []
+      }
+    },
+    {
+      "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 13,
+      "ts": "2026-11-14T16:27:10.000Z",
+      "origin": "agent",
+      "cursor": 26,
+      "type": "message.posted",
+      "refs": {
+        "task": "api-create-task"
+      },
+      "summary": "Notification from Tiam: Pushed tiam/api-create-task; tests green locally.",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [],
+        "retrievedBy": [],
+        "acknowledgedBy": []
+      }
+    },
+    {
+      "id": "1fb70e0e726ae647a48b2b59a4d10ed32ee743d416c26a49e0615c0935d75a80",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 12,
+      "ts": "2026-11-14T16:17:10.000Z",
+      "origin": "agent",
+      "cursor": 25,
+      "type": "message.posted",
+      "refs": {
+        "topic": "api/create-task"
+      },
+      "summary": "Question from Tiam: Can you live with the bearer-token header?",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:17:16.000Z"
+          }
+        ],
+        "retrievedBy": [],
+        "acknowledgedBy": []
+      }
+    },
+    {
+      "id": "6ec566bd0f5d393defd053e35b3b940dc4b0a103980b6c4fcbb90bfde316e218",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 16,
+      "ts": "2026-11-14T16:04:10.000Z",
+      "origin": "hook",
+      "cursor": 22,
+      "type": "activity.captured",
+      "refs": {
+        "paths": [
+          "sample/server/index.js"
+        ]
+      },
+      "summary": "Commit 4e1c9a7 server: POST /tasks with bearer auth",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:04:16.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:11:10.000Z"
+          }
+        ],
+        "acknowledgedBy": []
+      }
+    },
+    {
+      "id": "35b57a1cda48e54d2e122b46e8669b2bcbdfeb0098ee7e73ee58c86762036ddb",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 10,
+      "ts": "2026-11-14T16:02:10.000Z",
+      "origin": "agent",
+      "cursor": 21,
+      "type": "progress.reported",
+      "refs": {
+        "task": "api-create-task"
+      },
+      "summary": "Progress api-create-task (in_progress): POST /tasks handler written behind the bearer check",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:02:16.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:09:10.000Z"
+          }
+        ],
+        "acknowledgedBy": []
+      }
+    },
+    {
+      "id": "0e663ea0e411fd7c55ea93c25d3e7531341abc42d420653151dc6670d19fb9f7",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 15,
+      "ts": "2026-11-14T15:57:10.000Z",
+      "origin": "agent",
+      "cursor": 20,
+      "type": "issue.resolved",
+      "refs": {},
+      "summary": "Resolved risk: Port is configurable via PORT.",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:57:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:01:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T16:03:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 11,
+      "ts": "2026-11-14T15:32:10.000Z",
+      "origin": "agent",
+      "cursor": 17,
+      "type": "message.posted",
+      "refs": {
+        "topic": "api/create-task"
+      },
+      "summary": "Reply from Tiam: Whole task: {id, title, done}. Status 201.",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:32:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:36:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:38:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 9,
+      "ts": "2026-11-14T15:07:10.000Z",
+      "origin": "agent",
+      "cursor": 14,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "api/create-task",
+        "task": "api-create-task"
+      },
+      "summary": "Decision api/create-task: POST /tasks takes {title} with a bearer token",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:07:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:11:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T15:13:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 6,
+      "ts": "2026-11-14T14:42:10.000Z",
+      "origin": "agent",
+      "cursor": 12,
+      "type": "task.claimed",
+      "refs": {
+        "task": "readme-update"
+      },
+      "summary": "Tiam claimed readme-update",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T14:42:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T14:46:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T14:48:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "379d5eca555470ac2ddddc00e0270e8de55b02d1c74190c0b0953a126462ffbb",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 14,
+      "ts": "2026-11-14T14:12:10.000Z",
+      "origin": "agent",
+      "cursor": 11,
+      "type": "issue.reported",
+      "refs": {},
+      "summary": "Risk: Port 4317 may collide with other local services",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T14:12:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T14:16:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T14:18:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 8,
+      "ts": "2026-11-14T13:22:10.000Z",
+      "origin": "agent",
+      "cursor": 10,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "server/storage"
+      },
+      "summary": "Decision server/storage: In-memory store with incremental ids (revises 1)",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T13:22:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T13:26:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T13:28:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 7,
+      "ts": "2026-11-14T12:32:10.000Z",
+      "origin": "agent",
+      "cursor": 9,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "server/storage"
+      },
+      "summary": "Decision server/storage: Keep tasks in memory",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:32:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:36:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:38:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "a332d65e094548072ac3c5c2a5c3daf5b409b25dee09c582986b88d8e51d9b34",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 5,
+      "ts": "2026-11-14T12:08:10.000Z",
+      "origin": "agent",
+      "cursor": 6,
+      "type": "task.claimed",
+      "refs": {
+        "task": "api-create-task",
+        "paths": [
+          "sample/server/**"
+        ]
+      },
+      "summary": "Tiam claimed api-create-task",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:08:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:12:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:14:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "5bbe14e439a6e2f4387e2e408a90b5c95696ca547d9f5a42555b03ba02839e3f",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 4,
+      "ts": "2026-11-14T12:07:10.000Z",
+      "origin": "agent",
+      "cursor": 5,
+      "type": "task.created",
+      "refs": {
+        "task": "api-create-task"
+      },
+      "summary": "Task api-create-task: POST /tasks endpoint",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:07:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:11:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:13:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 3,
+      "ts": "2026-11-14T12:02:10.000Z",
+      "origin": "agent",
+      "cursor": 4,
+      "type": "goal.set",
+      "refs": {},
+      "summary": "Goal: Ship task creation in Pocket Tasks (API + CLI)",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:02:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:06:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T12:08:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "83a0788d01b698544613c70c88a60c199a3f49835e38d1b93efcf3eb86847ad0",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 2,
+      "ts": "2026-11-14T11:42:10.000Z",
+      "origin": "human",
+      "cursor": 2,
+      "type": "participant.joined",
+      "refs": {},
+      "summary": "Tiam joined",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T11:42:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T11:46:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T11:48:10.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "id": "b1c00d428c1d6bb0e5701d4f461239ce53ee29b4137ae4eba5692a4423e84ee5",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 1,
+      "ts": "2026-11-14T11:42:10.000Z",
+      "origin": "human",
+      "cursor": 1,
+      "type": "project.created",
+      "refs": {},
+      "summary": "Project \"Pocket Tasks\" created",
+      "acknowledgedByMe": false,
+      "delivery": {
+        "savedLocally": true,
+        "deliveredTo": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T11:42:22.000Z"
+          }
+        ],
+        "retrievedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T11:46:10.000Z"
+          }
+        ],
+        "acknowledgedBy": [
+          {
+            "participant": "p_6ae0107a3cc7a824414b71ef",
+            "at": "2026-11-14T11:48:10.000Z"
+          }
+        ]
+      }
+    }
+  ],
+  "recent": [
+    {
+      "id": "14be73c39295e6d6a3ff4c02700963cac89a98ac2b10b68f275bb22d65806b4e",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 17,
+      "ts": "2026-11-14T16:32:10.000Z",
+      "origin": "fallback",
+      "cursor": 27,
+      "type": "message.posted",
+      "refs": {
+        "task": "readme-update"
+      },
+      "summary": "Notification from Tiam: Draft imported while the daemon was restarting",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 13,
+      "ts": "2026-11-14T16:27:10.000Z",
+      "origin": "agent",
+      "cursor": 26,
+      "type": "message.posted",
+      "refs": {
+        "task": "api-create-task"
+      },
+      "summary": "Notification from Tiam: Pushed tiam/api-create-task; tests green locally.",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "1fb70e0e726ae647a48b2b59a4d10ed32ee743d416c26a49e0615c0935d75a80",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 12,
+      "ts": "2026-11-14T16:17:10.000Z",
+      "origin": "agent",
+      "cursor": 25,
+      "type": "message.posted",
+      "refs": {
+        "topic": "api/create-task"
+      },
+      "summary": "Question from Tiam: Can you live with the bearer-token header?",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "2d10696d0e758405a8000218ec77851d027c920b447cc355541eea494df1e9d3",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 9,
+      "ts": "2026-11-14T16:14:10.000Z",
+      "origin": "hook",
+      "cursor": 24,
+      "type": "activity.captured",
+      "refs": {
+        "paths": [
+          "sample/client/index.js",
+          "sample/test/client.test.js"
+        ]
+      },
+      "summary": "Edited sample/client/index.js, sample/test/client.test.js",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "fc298faedbf349adb0b30dc73710663f9b5a9fe50ed5a247438a4661e58766cb",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 6,
+      "ts": "2026-11-14T16:12:10.000Z",
+      "origin": "agent",
+      "cursor": 23,
+      "type": "progress.reported",
+      "refs": {
+        "task": "client-add-command"
+      },
+      "summary": "Progress client-add-command (blocked): request format depends on api/create-task",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "6ec566bd0f5d393defd053e35b3b940dc4b0a103980b6c4fcbb90bfde316e218",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 16,
+      "ts": "2026-11-14T16:04:10.000Z",
+      "origin": "hook",
+      "cursor": 22,
+      "type": "activity.captured",
+      "refs": {
+        "paths": [
+          "sample/server/index.js"
+        ]
+      },
+      "summary": "Commit 4e1c9a7 server: POST /tasks with bearer auth",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "35b57a1cda48e54d2e122b46e8669b2bcbdfeb0098ee7e73ee58c86762036ddb",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 10,
+      "ts": "2026-11-14T16:02:10.000Z",
+      "origin": "agent",
+      "cursor": 21,
+      "type": "progress.reported",
+      "refs": {
+        "task": "api-create-task"
+      },
+      "summary": "Progress api-create-task (in_progress): POST /tasks handler written behind the bearer check",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "0e663ea0e411fd7c55ea93c25d3e7531341abc42d420653151dc6670d19fb9f7",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 15,
+      "ts": "2026-11-14T15:57:10.000Z",
+      "origin": "agent",
+      "cursor": 20,
+      "type": "issue.resolved",
+      "refs": {},
+      "summary": "Resolved risk: Port is configurable via PORT.",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "7bc17cbe4d921ac0d697a2e6cdb29f7729c522d77a02702c2036d601dbe2771c",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 8,
+      "ts": "2026-11-14T15:52:10.000Z",
+      "origin": "agent",
+      "cursor": 19,
+      "type": "issue.reported",
+      "refs": {},
+      "summary": "Bug: GET /tasks returns 200 with HTML on unknown routes",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "abbff9366eb9a3ff720c9bcb17a0073a846c1bd9030d4114bf88fdcd96b9a59e",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 10,
+      "ts": "2026-11-14T15:37:10.000Z",
+      "origin": "agent",
+      "cursor": 18,
+      "type": "ack.recorded",
+      "refs": {},
+      "summary": "Namit acknowledged 2 updates",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 11,
+      "ts": "2026-11-14T15:32:10.000Z",
+      "origin": "agent",
+      "cursor": 17,
+      "type": "message.posted",
+      "refs": {
+        "topic": "api/create-task"
+      },
+      "summary": "Reply from Tiam: Whole task: {id, title, done}. Status 201.",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "438fcf7e5d81fc5e2b36ceb3a000ddb4415d920c2c3e45091f6b085eaae77429",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 7,
+      "ts": "2026-11-14T15:22:10.000Z",
+      "origin": "agent",
+      "cursor": 16,
+      "type": "message.posted",
+      "refs": {
+        "topic": "api/create-task"
+      },
+      "summary": "Question from Namit: Should POST /tasks return the whole task or just the id?",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 5,
+      "ts": "2026-11-14T15:09:10.000Z",
+      "origin": "agent",
+      "cursor": 15,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "api/create-task",
+        "task": "client-add-command"
+      },
+      "summary": "Decision api/create-task (proposed): POST /tasks takes {title, due?} with X-Api-Key",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 9,
+      "ts": "2026-11-14T15:07:10.000Z",
+      "origin": "agent",
+      "cursor": 14,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "api/create-task",
+        "task": "api-create-task"
+      },
+      "summary": "Decision api/create-task: POST /tasks takes {title} with a bearer token",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "51f02fede8506e7acca789c343e60ec1c3f8ccc00d2c4a209d06246a4790bd8e",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 4,
+      "ts": "2026-11-14T14:44:10.000Z",
+      "origin": "agent",
+      "cursor": 13,
+      "type": "task.claimed",
+      "refs": {
+        "task": "readme-update"
+      },
+      "summary": "Namit claimed readme-update",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 6,
+      "ts": "2026-11-14T14:42:10.000Z",
+      "origin": "agent",
+      "cursor": 12,
+      "type": "task.claimed",
+      "refs": {
+        "task": "readme-update"
+      },
+      "summary": "Tiam claimed readme-update",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "379d5eca555470ac2ddddc00e0270e8de55b02d1c74190c0b0953a126462ffbb",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 14,
+      "ts": "2026-11-14T14:12:10.000Z",
+      "origin": "agent",
+      "cursor": 11,
+      "type": "issue.reported",
+      "refs": {},
+      "summary": "Risk: Port 4317 may collide with other local services",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 8,
+      "ts": "2026-11-14T13:22:10.000Z",
+      "origin": "agent",
+      "cursor": 10,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "server/storage"
+      },
+      "summary": "Decision server/storage: In-memory store with incremental ids (revises 1)",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 7,
+      "ts": "2026-11-14T12:32:10.000Z",
+      "origin": "agent",
+      "cursor": 9,
+      "type": "decision.recorded",
+      "refs": {
+        "topic": "server/storage"
+      },
+      "summary": "Decision server/storage: Keep tasks in memory",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "0f0627f69759e03bdfb95d5e366d3bb3ebce8fbcd6aea09a8c11a06437ebc2db",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 3,
+      "ts": "2026-11-14T12:23:10.000Z",
+      "origin": "agent",
+      "cursor": 8,
+      "type": "task.claimed",
+      "refs": {
+        "task": "client-add-command",
+        "paths": [
+          "sample/client/**"
+        ]
+      },
+      "summary": "Namit claimed client-add-command",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "c06d38800a576ab91caaef0cd35d29170035d481c61f56d40e3c0b4a5ace7644",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 2,
+      "ts": "2026-11-14T12:22:10.000Z",
+      "origin": "agent",
+      "cursor": 7,
+      "type": "task.created",
+      "refs": {
+        "task": "client-add-command"
+      },
+      "summary": "Task client-add-command: CLI `add` command",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "a332d65e094548072ac3c5c2a5c3daf5b409b25dee09c582986b88d8e51d9b34",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 5,
+      "ts": "2026-11-14T12:08:10.000Z",
+      "origin": "agent",
+      "cursor": 6,
+      "type": "task.claimed",
+      "refs": {
+        "task": "api-create-task",
+        "paths": [
+          "sample/server/**"
+        ]
+      },
+      "summary": "Tiam claimed api-create-task",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "5bbe14e439a6e2f4387e2e408a90b5c95696ca547d9f5a42555b03ba02839e3f",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 4,
+      "ts": "2026-11-14T12:07:10.000Z",
+      "origin": "agent",
+      "cursor": 5,
+      "type": "task.created",
+      "refs": {
+        "task": "api-create-task"
+      },
+      "summary": "Task api-create-task: POST /tasks endpoint",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 3,
+      "ts": "2026-11-14T12:02:10.000Z",
+      "origin": "agent",
+      "cursor": 4,
+      "type": "goal.set",
+      "refs": {},
+      "summary": "Goal: Ship task creation in Pocket Tasks (API + CLI)",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "aa3d173328f41f73a595cf3c3c073319ee90863280037dbb2ba623be9ec773c6",
+      "author": "p_6ae0107a3cc7a824414b71ef",
+      "authorName": "Namit",
+      "seq": 1,
+      "ts": "2026-11-14T11:52:10.000Z",
+      "origin": "human",
+      "cursor": 3,
+      "type": "participant.joined",
+      "refs": {},
+      "summary": "Namit joined",
+      "acknowledgedByMe": true
+    },
+    {
+      "id": "83a0788d01b698544613c70c88a60c199a3f49835e38d1b93efcf3eb86847ad0",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 2,
+      "ts": "2026-11-14T11:42:10.000Z",
+      "origin": "human",
+      "cursor": 2,
+      "type": "participant.joined",
+      "refs": {},
+      "summary": "Tiam joined",
+      "acknowledgedByMe": false
+    },
+    {
+      "id": "b1c00d428c1d6bb0e5701d4f461239ce53ee29b4137ae4eba5692a4423e84ee5",
+      "author": "p_4c2dbbafa3e4534493cac8ff",
+      "authorName": "Tiam",
+      "seq": 1,
+      "ts": "2026-11-14T11:42:10.000Z",
+      "origin": "human",
+      "cursor": 1,
+      "type": "project.created",
+      "refs": {},
+      "summary": "Project \"Pocket Tasks\" created",
+      "acknowledgedByMe": false
+    }
+  ],
+  "fixture": true
+}

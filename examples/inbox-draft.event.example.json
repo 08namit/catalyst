@@ -1,0 +1,13 @@
+{
+  "catalystDraft": 1,
+  "clientId": "commit:4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+  "event": {
+    "type": "activity.captured",
+    "payload": {
+      "kind": "commit",
+      "summary": "Commit 4b825dc: Add login form",
+      "commits": [{ "hash": "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "message": "Add login form" }]
+    }
+  },
+  "writtenAt": "2026-11-14T10:31:00.000Z"
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="no-referrer">
+  <title>Catalyst dashboard</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Catalyst</div>
+      <h1 id="project-name">Dashboard</h1>
+      <dl id="meta" class="meta"></dl>
+    </div>
+  </header>
+  <div id="banners" class="banners" aria-live="polite"></div>
+  <main id="main" class="grid">
+    <p class="loading">Loading…</p>
+  </main>
+  <noscript><p class="panel">The Catalyst dashboard needs JavaScript. Use <code>catalyst status</code> in a terminal instead.</p></noscript>
+</body>
+</html>

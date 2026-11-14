@@ -1,0 +1,13 @@
+{
+  "projectId": "prj_000000000000000000000000",
+  "projectName": "my-app",
+  "participantId": "p_000000000000000000000000",
+  "name": "Tiam",
+  "peerPort": 0,
+  "peerBind": "0.0.0.0",
+  "apiPort": 0,
+  "advertiseHosts": [],
+  "createdByMe": true,
+  "autoHandover": true,
+  "createdAt": "2026-11-14T09:00:00.000Z"
+}

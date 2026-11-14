@@ -1,0 +1,13 @@
+{
+  "catalystDraft": 1,
+  "clientId": "3f2b8c1e-7d4a-4e5b-9c6d-0a1b2c3d4e5f",
+  "tool": "publish_decision",
+  "input": {
+    "topic": "api/auth-format",
+    "title": "Auth header format",
+    "decision": "All API routes take `Authorization: Bearer <JWT>`; tokens expire after 1 hour.",
+    "rationale": "Matches the existing frontend client and keeps the server stateless.",
+    "codeRefs": ["src/api/auth.ts"]
+  },
+  "writtenAt": "2026-11-14T10:30:00.000Z"
+}

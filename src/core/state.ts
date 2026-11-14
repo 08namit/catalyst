@@ -145,6 +145,8 @@ export interface ProjectState {
   questions: QuestionView[];
   notifications: MessageView[];
   issues: IssueView[];
+  /** Latest task-less progress report per author (deterministic order). Task progress lives in tasks[].latestProgress. */
+  generalProgress: ProgressView[];
   /** Most recent activity first, max 50. */
   activity: ActivityView[];
   /** eventId → participant ids that acknowledged it. */

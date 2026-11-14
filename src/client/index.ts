@@ -13,7 +13,14 @@ import { projectPaths, type ProjectPaths } from '../core/paths.js';
 import type { ApiError, HealthResponse } from '../core/api.js';
 
 export class DaemonUnavailableError extends Error {
-  constructor(message: string) {
+  /**
+   * true when the request certainly never reached a daemon (not running / connection refused), so retrying a
+   * write cannot duplicate it. false when it may have been received (e.g. timeout mid-request).
+   */
+  constructor(
+    message: string,
+    public readonly retryable = true,
+  ) {
     super(message);
     this.name = 'DaemonUnavailableError';
   }
@@ -164,7 +171,9 @@ export class CatalystClient {
       r = await httpJson(info.apiPort, method, path, { token: info.token, body, timeoutMs: this.opts.timeoutMs, headers });
     } catch (err) {
       this.info = null;
-      throw new DaemonUnavailableError(`Catalyst daemon unreachable: ${(err as Error).message}`);
+      const code = (err as NodeJS.ErrnoException).code;
+      const neverSent = code === 'ECONNREFUSED' || code === 'ENOENT';
+      throw new DaemonUnavailableError(`Catalyst daemon unreachable: ${(err as Error).message}`, neverSent);
     }
     if (r.status >= 200 && r.status < 300) return r.body as T;
     const e = (r.body as ApiError | null)?.error;

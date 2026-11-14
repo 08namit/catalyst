@@ -1,0 +1,15 @@
+{
+  "name": "catalyst-sample-pocket-tasks",
+  "version": "0.1.0",
+  "description": "Pocket Tasks: a tiny demo app (HTTP API + CLI client) for the Catalyst two-developer demo.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test"
+  }
+}

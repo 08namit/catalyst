@@ -103,6 +103,8 @@ export interface PeerDirectory {
 export interface EventStore extends SyncStore, InviteStore {
   append(input: AppendInput): { event: CatalystEvent; cursor: number; duplicate: boolean };
   getEvent(id: string): StoredEvent | null;
+  /** Event previously appended with this idempotency key, if any. */
+  findByClientId(clientId: string): StoredEvent | null;
   /** Events with cursor > since, ascending. */
   listSince(since: number, opts?: { limit?: number; excludeAuthor?: string; types?: string[] }): StoredEvent[];
   latestCursor(): number;
