@@ -141,16 +141,21 @@ Each agent reports changed files, assumptions, checks run and open issues.
 - Two-laptop procedure documented in DEMO.md (LAN IP, firewall note, `--host`).
 - Final report: launch commands, test/build output, evidence, remaining limitations (no NAT traversal/relay, advisory ownership, cloud model still required, hooks can't force turns).
 
-## Status
+## Status (2026-11-14)
 
-| Step | State | Notes |
+| Step | State | Evidence |
 |---|---|---|
-| 0. Scaffold + contracts (`src/core/*`, `src/sync/frames.ts`, `src/client`) | done | typecheck passes |
-| 1. Storage + projections + handover | in progress | Claude subagent |
-| 2. Networking (TLS-PSK, sync, pairing) | in progress | Codex via plugin companion |
-| 3. Daemon + CLI | in progress | Claude subagent |
-| 4. MCP + hooks + setup | in progress | Claude subagent |
-| 5. Dashboard + setup page + sample | in progress | Claude subagent |
-| Integration, e2e, review | pending | |
-| Live Claude verification | pending | |
-| Docs (README, PROTOCOL, DEMO) | pending | |
+| 0. Scaffold + frozen contracts (`src/core/*`, `src/sync/frames.ts`, `src/client`) | done | typecheck clean |
+| 1. Storage, projections, briefing, handover (Claude subagent) | done | `test/store`, `test/handover` |
+| 2. Networking: TLS-PSK, vector replay, pairing (Codex via plugin) | done | `test/sync` over real TLS (Codex sandbox could not open sockets; lead ran and fixed tests) |
+| 3. Daemon + CLI (Claude subagent) | done | `test/daemon`, `test/cli` |
+| 4. MCP adapter, hooks, Claude setup (Claude subagent) | done | `test/mcp`, `test/hooks`, `test/setup` |
+| 5. Dashboard, setup page, sample app (Claude subagent) | done | `test/dashboard`, `sample/` tests, headless-Chrome screenshots |
+| Integration + e2e (Claude subagent) | done | `npm run test:e2e` (17 tests), `scripts/two-node-demo.sh` |
+| Independent review (Codex adversarial review) | done | 5 high + 3 medium findings, all fixed with regression tests |
+| Milestone 3: two real Claude sessions exchange a decision | done | DEMO.md part B (5 live `claude -p` sessions, demo steps 1–8) |
+| Milestone 5: dashboard on live data | done | `docs/dashboard-live.png` |
+| Milestone 6: fallback + docs | done | README, PROTOCOL, DEMO, examples, site |
+
+Not verified live: interactive Claude Code sessions (MCP approval / trust dialog), UserPromptSubmit notice inside a
+live session (covered by e2e with the real hook binary), two physical laptops (procedure in DEMO.md part C).

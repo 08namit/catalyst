@@ -71,18 +71,19 @@ export function renderHandoverBlock(state: ProjectState): string {
   }
   out.push('');
 
-  // Decisions
-  const settled = state.decisions.filter((d) => !d.conflict);
-  const heads = settled.flatMap((d) => d.heads);
+  // Decisions. The version "in force" for a topic is its accepted/resolved head, or — while newer proposals or a
+  // conflict are pending — the most recent accepted/resolved version in its history. Proposals never hide it.
   out.push('### Decisions');
-  out.push(
-    ...bounded(
-      heads.filter((h) => h.status !== 'proposed').map((h) => `- **${h.topic}** — ${t(h.title)}: ${t(h.decision, 300)} (${by(h)})`),
-      20,
-      '- No accepted decisions yet.',
-    ),
-  );
-  const proposed = heads.filter((h) => h.status === 'proposed');
+  const inForce: string[] = [];
+  for (const d of state.decisions) {
+    const acceptedHead = d.conflict ? undefined : d.heads.find((h) => h.status !== 'proposed');
+    const current = acceptedHead ?? [...d.history].reverse().find((h) => h.status !== 'proposed');
+    if (!current) continue;
+    const pending = d.conflict ? ' — ⚠ conflicting revisions pending (see Open conflicts)' : acceptedHead ? '' : ' — revision proposed (see below)';
+    inForce.push(`- **${d.topic}** — ${t(current.title)}: ${t(current.decision, 300)} (${by(current)})${pending}`);
+  }
+  out.push(...bounded(inForce, 20, '- No accepted decisions yet.'));
+  const proposed = state.decisions.filter((d) => !d.conflict).flatMap((d) => d.heads.filter((h) => h.status === 'proposed'));
   if (proposed.length) {
     out.push('', 'Proposed (awaiting agreement):');
     out.push(...bounded(proposed.map((h) => `- **${h.topic}** — ${t(h.title)}: ${t(h.decision, 300)} (${by(h)})`), 10, ''));

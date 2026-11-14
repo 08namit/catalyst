@@ -49,6 +49,12 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
   // (4) relevant current records: decision heads, live claims, latest progress, open issues
   const candidates = [
     ...state.decisions.flatMap((d) => d.heads.map((h) => h.id)),
+    // While a topic only has proposals/conflicting heads, the last accepted version is still the one in force.
+    ...state.decisions.flatMap((d) =>
+      d.conflict || d.heads.every((h) => h.status === 'proposed')
+        ? [...d.history].reverse().filter((h) => h.status !== 'proposed').slice(0, 1).map((h) => h.id)
+        : [],
+    ),
     ...state.tasks.flatMap((t) => [...t.claims.map((c) => c.id), ...t.latestProgress.map((p) => p.id)]),
     ...state.issues.filter((i) => i.status === 'open').map((i) => i.id),
   ].filter((id) => !shown.has(id));
