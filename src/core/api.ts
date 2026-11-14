@@ -379,12 +379,30 @@ export interface InboxImportResponse {
   rejected: Array<{ file: string; error: string }>;
 }
 
+/**
+ * GET /api/unread?session=<id>&markNotified=1 — cheap summary for the UserPromptSubmit hook.
+ * Does NOT record retrieval or advance the session's get_updates cursor. With markNotified=1 the daemon
+ * remembers the latest cursor it reported for that session so the same updates are not announced twice.
+ */
+export interface UnreadSummary {
+  /** Peer events not yet acknowledged by this participant. */
+  count: number;
+  /** Peer events newer than the last notice for this session. */
+  newSinceLastNotice: number;
+  byType: Record<string, number>;
+  questionsForMe: number;
+  openConflicts: number;
+  freshness: string;
+  latestCursor: number;
+}
+
 /** POST /api/shutdown → { ok: true } then the daemon exits. */
 
 export const API_ROUTES = {
   health: 'GET /health',
   status: 'GET /api/status',
   state: 'GET /api/state',
+  unread: 'GET /api/unread',
   append: 'POST /api/events',
   tool: 'POST /api/tools/:name',
   session: 'POST /api/sessions',

@@ -22,6 +22,8 @@ export interface ProjectConfig {
   advertiseHosts: string[];
   /** true on the node that ran `catalyst init` (it emits project.created); false on joiners. */
   createdByMe: boolean;
+  /** Regenerate IMPORTANT.md automatically after material changes (default true). */
+  autoHandover?: boolean;
   createdAt: string;
 }
 

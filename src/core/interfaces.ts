@@ -7,6 +7,7 @@ import type { CatalystEvent, EventRefs, EventType, Origin } from './protocol.js'
 import type { PeerSecret } from './config.js';
 import type { ForkAlarm, ProjectState } from './state.js';
 import type { PeerStatus, SessionInfo, UpdateItem } from './api.js';
+import type { Logger } from './log.js';
 
 export interface AppendInput {
   type: EventType;
@@ -140,4 +141,49 @@ export interface PeerManagerApi {
   setPeerAddrs(participant: string, addrs: string[]): void;
   /** Push newly appended events now (also triggered automatically via store.onAppend). */
   kick(): void;
+}
+
+/** Constructor options for `new PeerManager(opts)` in src/sync/peer.ts. */
+export interface PeerManagerOptions {
+  store: SyncStore;
+  invites: InviteStore;
+  directory: PeerDirectory;
+  identity: { participantId: string; name: string; publicKey: string };
+  projectId: string;
+  projectName: string;
+  /** Peer listener bind address, e.g. "0.0.0.0" or "127.0.0.1". */
+  bind: string;
+  /** 0 = ephemeral (the actual port is returned by start()). */
+  port: number;
+  /** Hosts advertised in hello frames / invitations; empty = auto-detect non-internal IPv4 (fallback 127.0.0.1). */
+  advertiseHosts: string[];
+  logger: Logger;
+  /** Peer sessions for PeerStatus.sessions (usually store.peerSessions). */
+  getPeerSessions?: (peer: string) => SessionInfo[];
+  /** Called after a joiner completes pairing with this node. */
+  onPeerJoined?: (peer: PeerSecret) => void;
+  /** Called whenever any peer's connection state changes. */
+  onStatusChange?: (status: PeerStatus[]) => void;
+  /** Test hooks. */
+  backoff?: { minMs: number; maxMs: number };
+  statusIntervalMs?: number;
+  now?: () => Date;
+}
+
+/**
+ * Filesystem fallback draft (.catalyst/inbox/<anything>.json), written by agents when the MCP server/daemon is
+ * unavailable. Imported idempotently by the daemon (keyed by clientId); invalid files are moved to inbox/rejected/
+ * with a sibling .error.txt. Exactly one of `tool` or `event` must be present.
+ */
+export interface InboxDraft {
+  catalystDraft: 1;
+  /** Unique id (e.g. a UUID) — the idempotency key. */
+  clientId: string;
+  /** Tool-shaped draft: same input as the MCP tool (publish_decision, publish_progress, send_message, claim_task, release_task, report_issue, resolve_issue, set_goal). */
+  tool?: string;
+  input?: Record<string, unknown>;
+  /** Raw append (used by hooks for activity.captured when the daemon is down). */
+  event?: { type: string; payload: Record<string, unknown>; refs?: EventRefs; supersedes?: string[] };
+  /** Optional: when the draft was written (display only). */
+  writtenAt?: string;
 }
