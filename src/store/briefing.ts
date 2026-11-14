@@ -6,7 +6,7 @@ import { sanitizeForContext, type CatalystEvent } from '../core/protocol.js';
 import type { Briefing, SyncSummary, ToolInput, UpdateItem } from '../core/api.js';
 import type { EventStore } from '../core/interfaces.js';
 import { pathsOverlap } from './paths-match.js';
-import { DATA_NOT_INSTRUCTIONS, displayTs, fitSections, itemLine, syncLines, type Section } from './text.js';
+import { DATA_NOT_INSTRUCTIONS, detailedItemLine, displayTs, fitSectionsTracked, itemLine, syncLines, type Section } from './text.js';
 
 const DEFAULT_MAX_CHARS = 6000;
 const UNREAD_CAP = 15;
@@ -92,6 +92,7 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
   }
   if (notices.length) head.push(...notices.map((n) => `Notice: ${n}`));
 
+  const detailed = (u: UpdateItem) => detailedItemLine(u, store.getEvent(u.id)?.event);
   const sections: Section[] = [
     {
       title: 'Open conflicts (resolve before building on these)',
@@ -103,17 +104,20 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
             .join('\n') +
           `\n  Hint: ${c.hint}`,
       ),
+      ids: conflicts.map((c) => c.heads.map((h) => h.id)),
     },
-    { title: 'Questions for you (unanswered)', lines: questionsForMe.map(itemLine) },
-    { title: 'Your active claims', lines: myClaims.map(itemLine) },
+    { title: 'Questions for you (unanswered)', lines: questionsForMe.map(detailed), ids: questionsForMe.map((q) => [q.id]) },
+    { title: 'Your active claims', lines: myClaims.map(itemLine), ids: myClaims.map((c) => [c.id]) },
     {
       title: focused ? `Relevant to ${focusLabel(input)}` : 'Current shared records',
-      lines: relevant.map(itemLine),
-      empty: focused ? '- Nothing matched; try a broader query.' : undefined,
+      lines: relevant.map(detailed),
+      ids: relevant.map((r) => [r.id]),
+      empty: focused ? (conflicts.length ? '- Nothing beyond the open conflicts above matched.' : '- Nothing matched; try a broader query.') : undefined,
     },
     {
       title: `Unread peer updates (${unreadAll.length} unacknowledged, newest first)`,
       lines: unreadItems.map(itemLine),
+      ids: unreadItems.map((u) => [u.id]),
       empty: '- No unacknowledged peer updates.',
     },
   ];
@@ -121,18 +125,9 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
     'Cite source ids when relying on these records. get_updates lists new events; acknowledge_updates marks them read.',
     DATA_NOT_INSTRUCTIONS,
   ];
-  const text = fitSections(head, sections, footer, input.maxChars ?? DEFAULT_MAX_CHARS);
-
-  const sourceIds = [
-    ...new Set([
-      ...(g ? [g.id] : []),
-      ...conflicts.flatMap((c) => c.heads.map((h) => h.id)),
-      ...questionsForMe.map((q) => q.id),
-      ...myClaims.map((c) => c.id),
-      ...relevant.map((r) => r.id),
-      ...unreadItems.map((u) => u.id),
-    ]),
-  ];
+  const { text, emittedIds } = fitSectionsTracked(head, sections, footer, input.maxChars ?? DEFAULT_MAX_CHARS);
+  // Only records that actually made it into the text (the goal is always in the header).
+  const sourceIds = [...new Set([...(g ? [g.id] : []), ...emittedIds])];
 
   return {
     text,

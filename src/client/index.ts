@@ -160,10 +160,10 @@ export class CatalystClient {
     return started.health;
   }
 
-  async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  async request<T>(method: 'GET' | 'POST', path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
     if (!this.info) await this.connect();
     const info = this.info!;
-    const headers: Record<string, string> = { 'x-catalyst-client': this.opts.client };
+    const headers: Record<string, string> = { 'x-catalyst-client': this.opts.client, ...extraHeaders };
     if (this.opts.session) headers['x-catalyst-session'] = this.opts.session;
     if (this.opts.claudePid) headers['x-catalyst-client-pid'] = String(this.opts.claudePid);
     let r: RawResponse;
@@ -187,7 +187,8 @@ export class CatalystClient {
   post<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>('POST', path, body ?? {});
   }
-  tool<T>(name: string, input: unknown): Promise<T> {
-    return this.post<T>(`/api/tools/${name}`, input);
+  /** `clientId` is an idempotency key: re-sending the same write with the same key records it once. */
+  tool<T>(name: string, input: unknown, opts: { clientId?: string } = {}): Promise<T> {
+    return this.request<T>('POST', `/api/tools/${name}`, input ?? {}, opts.clientId ? { 'x-catalyst-client-id': opts.clientId } : {});
   }
 }

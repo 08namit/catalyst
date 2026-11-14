@@ -201,8 +201,9 @@ export class PeerManager implements PeerManagerApi {
       try { this.receive(session, frame); }
       catch (error) { this.opts.logger.error('Peer frame handling failed', error); this.fail(conn, 'internal', 'Could not process peer frame'); }
     });
+    const vector = this.opts.store.getVector();
     conn.send({ t: 'hello', protocol: PROTOCOL_VERSION, software: SOFTWARE_VERSION, project: this.opts.projectId,
-      participant: this.opts.identity.participantId, name: this.opts.identity.name, addrs: this.addrs(), vector: this.opts.store.getVector() });
+      participant: this.opts.identity.participantId, name: this.opts.identity.name, addrs: this.addrs(), vector, heads: this.headsFor(vector) });
   }
 
   private receive(session: Session, frame: Frame): void {
@@ -264,11 +265,44 @@ export class PeerManager implements PeerManagerApi {
     existing?.conn.close();
     const current = this.opts.directory.getPeer(peer)!;
     if (JSON.stringify(current.addrs) !== JSON.stringify(frame.addrs)) this.opts.directory.updatePeerAddrs(peer, frame.addrs);
-    this.opts.store.markDeliveredByVector(peer, frame.vector);
+    const divergent = this.divergentAuthors(frame);
+    const covered = Object.fromEntries(Object.entries(frame.vector).filter(([author]) => !divergent.includes(author)));
+    this.opts.store.markDeliveredByVector(peer, covered);
     entry.failures = 0;
     this.transition(peer, 'connected');
+    for (const author of divergent) {
+      // Send our version of the clashing seq so the peer's store records an authenticated fork alarm.
+      const seq = frame.vector[author]!;
+      const mine = this.opts.store.getEventsAfter(author, seq - 1, 1);
+      this.opts.logger.error('Divergent history detected (fork)', { peer, author, seq, mine: mine[0]?.id, theirs: frame.heads?.[author] });
+      if (mine.length) this.sendEvents(session, mine, true);
+    }
     this.replay(session);
-    this.sendStatus(session, true);
+    this.sendStatus(session, true, true);
+  }
+
+  /** id of the event at vector[author] for every author (see HelloFrame.heads). */
+  private headsFor(vector: Record<string, number>): Record<string, string> {
+    const heads: Record<string, string> = {};
+    for (const [author, seq] of Object.entries(vector)) {
+      const e = this.opts.store.getEventsAfter(author, seq - 1, 1)[0];
+      if (e && e.seq === seq) heads[author] = e.id;
+    }
+    return heads;
+  }
+
+  /** Authors whose event at the peer's advertised seq differs from ours (same seq, different id). */
+  private divergentAuthors(frame: HelloFrame): string[] {
+    if (!frame.heads) return [];
+    const mine = this.opts.store.getVector();
+    const out: string[] = [];
+    for (const [author, seq] of Object.entries(frame.vector)) {
+      const theirs = frame.heads[author];
+      if (!theirs || seq < 1 || (mine[author] ?? 0) < seq) continue;
+      const e = this.opts.store.getEventsAfter(author, seq - 1, 1)[0];
+      if (e && e.seq === seq && e.id !== theirs) out.push(author);
+    }
+    return out;
   }
 
   private validateProtocol(conn: FramedConnection, protocol: number, project: string): boolean {
@@ -313,10 +347,10 @@ export class PeerManager implements PeerManagerApi {
     if (batch.length) session.conn.send({ t: 'events', events: batch, replay });
   }
 
-  private sendStatus(session: Session, force: boolean): void {
+  private sendStatus(session: Session, force: boolean, fromStart = false): void {
     const now = this.now().getTime();
     if (!force && now - session.lastStatusAt < (this.opts.statusIntervalMs ?? 5000)) return;
-    const body = this.opts.store.takeStatusFor(session.peer);
+    const body = this.opts.store.takeStatusFor(session.peer, { fromStart });
     const summary = JSON.stringify({ sessions: body.sessions, pending: body.pending });
     if (force || body.retrieved.length || summary !== session.lastStatusSummary) {
       session.conn.send({ t: 'status', ...body });
@@ -429,7 +463,7 @@ export class PeerManager implements PeerManagerApi {
   resume(): void {
     if (!this.paused) return;
     this.paused = false;
-    for (const peer of this.opts.directory.listPeers()) this.transition(peer.participantId, 'unreachable');
+    for (const peer of this.opts.directory.listPeers()) this.transition(peer.participantId, 'connecting');
     this.discoverPeers();
   }
   isPaused(): boolean { return this.paused; }

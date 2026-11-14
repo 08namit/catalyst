@@ -13,6 +13,7 @@ import {
   validateEnvelope,
   validatePayload,
   verifyEventSignature,
+  computeEventId,
   type CatalystEvent,
   type EventRefs,
   type PayloadOf,
@@ -278,7 +279,29 @@ export class SqliteEventStore implements EventStore {
     return result;
   }
 
-  /** Returns the author when the event was stored or parked (so parked successors can be drained). */
+  /** Author key for verifying `e`: participant.joined is self-certifying; otherwise a registered key (or null). */
+  private keyFor(e: CatalystEvent): { key: string | null; error?: string } {
+    if (e.type === 'participant.joined' && e.v <= PROTOCOL_VERSION) {
+      const key = (e.payload as PayloadOf<'participant.joined'>).publicKey;
+      if (participantIdFromPublicKey(key) !== e.author) return { key: null, error: 'participant.joined publicKey does not match author id' };
+      return { key };
+    }
+    return { key: this.publicKeyOf(e.author) };
+  }
+
+  private recordFork(author: string, seq: number, ids: string[], result: IngestResult): void {
+    const fork: ForkAlarm = { author, seq, eventIds: ids, detectedAt: this.nowIso() };
+    this.db.prepare('INSERT INTO forks (author, seq, ids, detected_at) VALUES (?, ?, ?, ?)').run(fork.author, fork.seq, JSON.stringify(fork.eventIds), fork.detectedAt);
+    this.cached = null;
+    result.forks.push(fork);
+    this.logger.error('fork detected', fork);
+  }
+
+  /**
+   * Returns the author when the event was stored or parked (so parked successors can be drained).
+   * Order matters for safety: authenticate (hash, and signature when the key is known) BEFORE dedupe/fork
+   * classification, so a forged event can neither reserve a seq slot nor fabricate a fork alarm.
+   */
   private ingestOne(raw: unknown, sourceLabel: string, result: IngestResult): string | null {
     const v = validateEnvelope(raw);
     if (!v.ok) {
@@ -290,44 +313,45 @@ export class SqliteEventStore implements EventStore {
       result.rejected.push({ id: e.id, reason: `wrong project: event belongs to ${e.project}, this node is ${this.projectId}` });
       return null;
     }
+    if (computeEventId(e) !== e.id) {
+      result.rejected.push({ id: e.id, reason: 'event id does not match content hash' });
+      return null;
+    }
+    const { key, error } = this.keyFor(e);
+    if (error) {
+      result.rejected.push({ id: e.id, reason: error });
+      return null;
+    }
+    if (key !== null) {
+      const sig = verifyEventSignature(e, key);
+      if (!sig.ok) {
+        result.rejected.push({ id: e.id, reason: `signature check failed: ${sig.reason}` });
+        return null;
+      }
+    }
     if (this.db.prepare('SELECT 1 AS x FROM events WHERE id = ? UNION ALL SELECT 1 FROM parked WHERE id = ?').get(e.id, e.id)) {
       result.duplicates.push(e.id);
       return null;
     }
-    const clash = (this.db.prepare('SELECT id FROM events WHERE author = ? AND seq = ?').get(e.author, e.seq)?.id ??
-      this.db.prepare('SELECT id FROM parked WHERE author = ? AND seq = ?').get(e.author, e.seq)?.id) as string | undefined;
-    if (clash !== undefined) {
-      const fork: ForkAlarm = { author: e.author, seq: e.seq, eventIds: [clash, e.id], detectedAt: this.nowIso() };
-      this.db.prepare('INSERT INTO forks (author, seq, ids, detected_at) VALUES (?, ?, ?, ?)').run(fork.author, fork.seq, JSON.stringify(fork.eventIds), fork.detectedAt);
-      this.cached = null;
-      result.forks.push(fork);
-      result.rejected.push({ id: e.id, reason: `fork: ${e.author} seq ${e.seq} already exists as ${clash.slice(0, 8)}` });
-      this.logger.error('fork detected', fork);
-      return null;
-    }
-
-    let key: string | null;
-    if (e.type === 'participant.joined' && e.v <= PROTOCOL_VERSION) {
-      key = (e.payload as PayloadOf<'participant.joined'>).publicKey;
-      if (participantIdFromPublicKey(key) !== e.author) {
-        result.rejected.push({ id: e.id, reason: 'participant.joined publicKey does not match author id' });
+    // Stored events are always verified, so a verified clash with one is a genuine fork.
+    const stored = this.db.prepare('SELECT id FROM events WHERE author = ? AND seq = ?').get(e.author, e.seq)?.id as string | undefined;
+    if (stored !== undefined) {
+      if (key === null) {
+        result.rejected.push({ id: e.id, reason: `unverifiable event for ${e.author} seq ${e.seq}, which is already stored` });
         return null;
       }
-    } else {
-      key = this.publicKeyOf(e.author);
+      this.recordFork(e.author, e.seq, [stored, e.id], result);
+      result.rejected.push({ id: e.id, reason: `fork: ${e.author} seq ${e.seq} already exists as ${stored.slice(0, 8)}` });
+      return null;
     }
     if (key === null || e.seq > this.contiguous(e.author) + 1) {
-      // Unknown key (arrives with the author's participant.joined) or a gap: park and verify on drain.
+      // Unknown key (arrives with the author's participant.joined) or a gap: park. Several candidates may be parked
+      // for one slot; they are authenticated and fork-checked when drained.
       this.db
         .prepare('INSERT INTO parked (id, author, seq, json, source, received_at) VALUES (?, ?, ?, ?, ?, ?)')
         .run(e.id, e.author, e.seq, JSON.stringify(e), sourceLabel, this.nowIso());
       result.parked.push(e.id);
       return e.author;
-    }
-    const sig = verifyEventSignature(e, key);
-    if (!sig.ok) {
-      result.rejected.push({ id: e.id, reason: `signature check failed: ${sig.reason}` });
-      return null;
     }
     this.insertEvent(e, sourceLabel, null);
     result.accepted.push(e);
@@ -337,20 +361,31 @@ export class SqliteEventStore implements EventStore {
   private drainParked(author: string, result: IngestResult): void {
     for (;;) {
       const next = this.contiguous(author) + 1;
-      const row = this.db.prepare('SELECT id, json, source FROM parked WHERE author = ? AND seq = ?').get(author, next);
-      if (!row) return;
-      const e = JSON.parse(row.json as string) as CatalystEvent;
-      const key =
-        e.type === 'participant.joined' && e.v <= PROTOCOL_VERSION ? (e.payload as PayloadOf<'participant.joined'>).publicKey : this.publicKeyOf(author);
-      if (key === null) return; // still waiting for the author's key
-      this.db.prepare('DELETE FROM parked WHERE id = ?').run(e.id);
-      const sig = verifyEventSignature(e, key);
-      if (!sig.ok) {
-        result.parked = result.parked.filter((id) => id !== e.id);
-        result.rejected.push({ id: e.id, reason: `signature check failed: ${sig.reason}` });
+      const rows = this.db.prepare('SELECT id, json, source FROM parked WHERE author = ? AND seq = ?').all(author, next);
+      if (rows.length === 0) return;
+      const valid: Array<{ e: CatalystEvent; source: string }> = [];
+      for (const row of rows) {
+        const e = JSON.parse(row.json as string) as CatalystEvent;
+        const { key, error } = this.keyFor(e);
+        if (key === null && !error) return; // still waiting for the author's key
+        const sig = key === null ? { ok: false as const, reason: error ?? 'no key' } : verifyEventSignature(e, key);
+        if (!sig.ok) {
+          this.db.prepare('DELETE FROM parked WHERE id = ?').run(e.id);
+          result.parked = result.parked.filter((id) => id !== e.id);
+          result.rejected.push({ id: e.id, reason: `signature check failed: ${sig.reason}` });
+          continue;
+        }
+        valid.push({ e, source: row.source as string });
+      }
+      if (valid.length === 0) continue; // all candidates were forgeries; the slot is still open
+      if (valid.length > 1) {
+        // Two authentic events for one slot: a real fork (e.g. a restored .catalyst/). Never pick one silently.
+        this.recordFork(author, next, valid.map((x) => x.e.id), result);
         return;
       }
-      this.insertEvent(e, row.source as string, null);
+      const { e, source } = valid[0]!;
+      this.db.prepare('DELETE FROM parked WHERE id = ?').run(e.id);
+      this.insertEvent(e, source, null);
       result.parked = result.parked.filter((id) => id !== e.id);
       result.accepted.push(e);
     }
@@ -405,9 +440,9 @@ export class SqliteEventStore implements EventStore {
     return () => this.listeners.delete(listener);
   }
 
-  takeStatusFor(peer: string): PeerStatusBody {
+  takeStatusFor(peer: string, opts: { fromStart?: boolean } = {}): PeerStatusBody {
     const retrieved = this.tx(() => {
-      const mark = Number(this.db.prepare('SELECT last_retrieval_rowid AS m FROM status_sent WHERE peer = ?').get(peer)?.m ?? 0);
+      const mark = opts.fromStart ? 0 : Number(this.db.prepare('SELECT last_retrieval_rowid AS m FROM status_sent WHERE peer = ?').get(peer)?.m ?? 0);
       const rows = this.db
         .prepare('SELECT r.id AS rid, r.event_id, r.at FROM retrievals r JOIN events e ON e.id = r.event_id WHERE e.author = ? AND r.id > ? ORDER BY r.id LIMIT ?')
         .all(peer, mark, STATUS_RETRIEVAL_CAP);
@@ -573,6 +608,13 @@ export class SqliteEventStore implements EventStore {
       summary: sanitizeForContext(summarizeEvent(e), 300),
       acknowledgedByMe: this.isAcknowledgedByMe(e.id),
     };
+  }
+
+  retrievedBy(session: string): string[] {
+    return this.db
+      .prepare('SELECT event_id, MIN(rowid) AS r FROM retrievals WHERE session = ? GROUP BY event_id ORDER BY r')
+      .all(session)
+      .map((row) => row.event_id as string);
   }
 
   recordRetrieval(session: string, eventIds: string[], at: string = this.nowIso()): void {

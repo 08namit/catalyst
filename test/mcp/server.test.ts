@@ -86,7 +86,7 @@ describe('MCP adapter', () => {
     const t = textOf(r);
     expect(t).toContain('Generated at 2026-11-14T10:00:00Z');
     expect(t).toContain('Decision api/auth: bearer JWT');
-    expect(t).toMatch(/\.catalyst\/inbox\/[0-9a-f-]{36}\.json/);
+    expect(t).toMatch(/\.catalyst\/inbox\/mcp-[0-9a-f-]{36}\.json/);
     expect(t).toContain('"catalystDraft": 1');
     expect(t).toContain('"tool": "publish_progress"');
     expect(t).toContain('Login form done');

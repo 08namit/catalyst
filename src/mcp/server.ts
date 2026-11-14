@@ -125,14 +125,17 @@ function buildServer(call: ToolCall): McpServer {
 export function createMcpServer(deps: McpDeps): McpServer {
   const { client, paths, logger } = deps;
   return buildServer(async (name, input) => {
+    // Writes get an idempotency key BEFORE dispatch; the retry and any fallback draft reuse it.
+    const clientId = DRAFT_TOOLS.has(name) ? `mcp:${randomUUID()}` : undefined;
     try {
-      return ok(await callTool(client, name, input));
+      return ok(await callTool(client, name, input, clientId));
     } catch (err) {
       logger.warn('tool call failed', { tool: name, err: (err as Error).message });
       if (err instanceof ApiRequestError) {
         return fail(`Catalyst rejected ${name} (${err.code}): ${err.message}${err.hint ? `\nHint: ${err.hint}` : ''}`);
       }
-      return fail(unavailableText(paths, name, input, (err as Error).message));
+      const uncertain = err instanceof DaemonUnavailableError && !err.retryable;
+      return fail(unavailableText(paths, name, input, (err as Error).message, clientId, uncertain));
     }
   });
 }
@@ -141,26 +144,38 @@ export function createMcpServer(deps: McpDeps): McpServer {
  * Proxy one call; if the daemon is down, try to (auto)start it once and retry — but only when the first request
  * certainly never reached a daemon, so a write can't be recorded twice.
  */
-async function callTool(client: CatalystClient, name: ToolName, input: Record<string, unknown>): Promise<string> {
+async function callTool(client: CatalystClient, name: ToolName, input: Record<string, unknown>, clientId?: string): Promise<string> {
   let result: ToolResultBase;
   try {
-    result = await client.tool<ToolResultBase>(name, input);
+    result = await client.tool<ToolResultBase>(name, input, { clientId });
   } catch (err) {
     if (!(err instanceof DaemonUnavailableError) || !err.retryable) throw err;
     await client.connect({ autostart: true, waitMs: 2000 });
-    result = await client.tool<ToolResultBase>(name, input);
+    result = await client.tool<ToolResultBase>(name, input, { clientId });
   }
   return typeof result?.text === 'string' ? result.text : JSON.stringify(result);
 }
 
-function unavailableText(paths: ProjectPaths, name: string, input: Record<string, unknown>, reason: string): string {
-  const parts = [`Catalyst is unavailable: ${reason}`, `Nothing was saved or retrieved by this ${name} call. To restart it, run \`catalyst start\` (diagnose with \`catalyst doctor\`) in ${paths.projectDir}.`];
+function unavailableText(
+  paths: ProjectPaths,
+  name: string,
+  input: Record<string, unknown>,
+  reason: string,
+  clientId?: string,
+  uncertain = false,
+): string {
+  const outcome = uncertain
+    ? `This ${name} call may or may not have been saved (the connection failed mid-request).`
+    : `Nothing was saved or retrieved by this ${name} call.`;
+  const parts = [`Catalyst is unavailable: ${reason}`, `${outcome} To restart it, run \`catalyst start\` (diagnose with \`catalyst doctor\`) in ${paths.projectDir}.`];
   if (DRAFT_TOOLS.has(name)) {
-    const id = randomUUID();
+    const id = clientId ?? `mcp:${randomUUID()}`;
+    const file = id.replace(/[^A-Za-z0-9_.-]/g, '-');
     const draft = { catalystDraft: 1, clientId: id, tool: name, input, writtenAt: new Date().toISOString() };
     parts.push(
-      `To record this update anyway, write the JSON below to .catalyst/inbox/${id}.json (in ${paths.projectDir}). ` +
-        'The daemon imports inbox drafts idempotently (keyed by clientId) when it next runs. Use a new UUID as both file name and clientId for every draft; ' +
+      `To record this update anyway, write the JSON below to .catalyst/inbox/${file}.json (in ${paths.projectDir}). ` +
+        'It carries the same clientId as this call, so if the daemon did save it, importing the draft adds nothing. ' +
+        'For any OTHER new update, use a fresh UUID as both file name and clientId; ' +
         `"tool" may be one of ${[...DRAFT_TOOLS].join(', ')} and "input" is that tool's input.\n\n\`\`\`json\n${JSON.stringify(draft, null, 2)}\n\`\`\``,
     );
   }

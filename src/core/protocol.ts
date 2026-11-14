@@ -227,7 +227,7 @@ export const envelopeSchema = z
     author: participantIdSchema,
     seq: z.number().int().min(1),
     lc: z.number().int().min(1),
-    ts: z.string().max(40),
+    ts: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/, 'must be an ISO-8601 UTC timestamp'),
     type: z.string().min(1).max(64),
     payload: z.record(z.string(), z.unknown()),
     refs: refsSchema,

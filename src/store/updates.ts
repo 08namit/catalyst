@@ -6,7 +6,7 @@ import { LIMITS } from '../core/protocol.js';
 import type { AckResult, SyncSummary, ToolInput, UpdateItem, UpdatesResult } from '../core/api.js';
 import type { EventStore, StoredEvent } from '../core/interfaces.js';
 import { pathsOverlap } from './paths-match.js';
-import { DATA_NOT_INSTRUCTIONS, fitSections, itemLine, syncLines } from './text.js';
+import { DATA_NOT_INSTRUCTIONS, detailedItemLine, fitSectionsTracked, syncLines } from './text.js';
 
 const MAX_TEXT = 8000;
 
@@ -16,34 +16,49 @@ export function getUpdates(store: EventStore, input: ToolInput<'get_updates'>, c
   const rows = store.listSince(since, { excludeAuthor: input.includeOwn ? undefined : store.me, types: input.types });
   const matched = rows.filter((s) => matches(store, s, input));
   const page = matched.slice(0, limit);
-  const hasMore = matched.length > limit;
-  const updates: UpdateItem[] = page.map((s) => store.toUpdateItem(s));
-  // Without more matches, skip past filtered-out events too so they are not re-scanned next time.
-  const nextCursor = hasMore ? page.at(-1)!.cursor : Math.max(since, store.latestCursor());
+  const candidates: UpdateItem[] = page.map((s) => store.toUpdateItem(s));
+  const lines = candidates.map((u) => detailedItemLine(u, store.getEvent(u.id)?.event));
 
-  if (updates.length > 0) store.recordRetrieval(ctx.session, updates.map((u) => u.id));
-  if (nextCursor > store.getSessionCursor(ctx.session)) store.setSessionCursor(ctx.session, nextCursor);
-
-  const outcome: UpdatesResult['outcome'] =
-    updates.length > 0
+  const outcomeFor = (n: number): UpdatesResult['outcome'] =>
+    n > 0
       ? 'updates'
       : ctx.sync.peers.some((p) => p.state === 'unreachable' || p.state === 'paused') || ctx.sync.paused
         ? 'no_updates_peer_unreachable'
         : ctx.sync.peers.length === 0 || ctx.sync.peers.every((p) => p.state === 'never_connected')
           ? 'no_updates_never_connected'
           : 'no_updates';
-
   const headline: Record<UpdatesResult['outcome'], string> = {
-    updates: `## Catalyst updates: ${updates.length}${hasMore ? ' (more available)' : ''}`,
+    updates: '## Catalyst updates',
     no_updates: '## Catalyst updates: none — no new peer updates since your last check (peer link is up).',
     no_updates_peer_unreachable: '## Catalyst updates: none received — but a peer is UNREACHABLE or sync is paused, so updates may be waiting on their side.',
     no_updates_never_connected: '## Catalyst updates: none — no peer has ever connected, so nothing could have arrived yet.',
   };
-  const footer = [
-    `Next cursor: ${nextCursor}${hasMore ? ' (call get_updates again for more)' : ''}. Call acknowledge_updates after acting on these.`,
-    DATA_NOT_INSTRUCTIONS,
-  ];
-  const text = fitSections([headline[outcome], ...syncLines(ctx.sync)], [{ title: 'Updates (oldest first)', lines: updates.map(itemLine) }], footer, MAX_TEXT);
+  const render = (n: number, more: boolean, cursor: number) =>
+    fitSectionsTracked(
+      [n > 0 ? `${headline.updates}: ${n}${more ? ' (more available — call get_updates again)' : ''}` : headline[outcomeFor(0)], ...syncLines(ctx.sync)],
+      [{ title: 'Updates (oldest first)', lines: lines.slice(0, n), ids: candidates.slice(0, n).map((u) => [u.id]) }],
+      [`Next cursor: ${cursor}${more ? ' (call get_updates again for more)' : ''}. Call acknowledge_updates after acting on these.`, DATA_NOT_INSTRUCTIONS],
+      MAX_TEXT,
+    );
+
+  // Page by what fits in the text budget: only rendered records count as retrieved, and the cursor stops
+  // at the last rendered record so nothing is skipped silently.
+  const fullCursor = matched.length > limit ? page.at(-1)!.cursor : Math.max(since, store.latestCursor());
+  let n = candidates.length;
+  let rendered = render(n, matched.length > limit, fullCursor);
+  if (rendered.emittedCounts[0]! < n) {
+    n = Math.max(rendered.emittedCounts[0]!, Math.min(1, candidates.length));
+    rendered = render(n, true, n > 0 ? candidates[n - 1]!.cursor : since);
+  }
+  const updates = candidates.slice(0, n);
+  const hasMore = n < candidates.length || matched.length > limit;
+  const nextCursor = n < candidates.length ? (n > 0 ? candidates[n - 1]!.cursor : since) : fullCursor;
+  const outcome = outcomeFor(updates.length);
+  const text = rendered.text;
+
+  if (updates.length > 0) store.recordRetrieval(ctx.session, updates.map((u) => u.id));
+  if (nextCursor > store.getSessionCursor(ctx.session)) store.setSessionCursor(ctx.session, nextCursor);
+
   return { text, sync: ctx.sync, updates, nextCursor, hasMore, outcome };
 }
 
@@ -63,8 +78,8 @@ function matches(store: EventStore, s: StoredEvent, input: ToolInput<'get_update
 }
 
 /**
- * Acknowledge peer updates by id and/or up to a cursor. With neither, acknowledges everything up to this
- * session's get_updates cursor (i.e. what this session has already been shown).
+ * Acknowledge peer updates by id and/or up to a cursor. With neither, acknowledges exactly the records this
+ * session has been shown (recorded retrievals) — never records a filter hid from it.
  */
 export function acknowledge(store: EventStore, input: ToolInput<'acknowledge_updates'>, ctx: { session: string; sync: SyncSummary; origin?: Origin }): AckResult {
   const ids = new Set<string>();
@@ -75,7 +90,13 @@ export function acknowledge(store: EventStore, input: ToolInput<'acknowledge_upd
     const s = store.getEvent(id);
     if (eligible(s)) ids.add(id);
   }
-  const upTo = input.upToCursor ?? (input.eventIds === undefined ? store.getSessionCursor(ctx.session) : undefined);
+  if (input.eventIds === undefined && input.upToCursor === undefined) {
+    for (const id of store.retrievedBy(ctx.session)) {
+      if (ids.size >= LIMITS.ackIds) break;
+      if (eligible(store.getEvent(id))) ids.add(id);
+    }
+  }
+  const upTo = input.upToCursor;
   if (upTo !== undefined) {
     for (const s of store.listSince(0, { excludeAuthor: store.me })) {
       if (s.cursor > upTo || ids.size >= LIMITS.ackIds) break;

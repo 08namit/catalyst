@@ -3,6 +3,7 @@
  * snapshot + IMPORTANT.md regeneration.
  */
 import type { FileWriteResponse, HealthResponse, PeerStatus, SyncSummary } from '../core/api.js';
+import { ensureDir } from '../core/config.js';
 import { loadConfig, loadIdentity, loadSecrets, saveConfig } from '../core/config.js';
 import type { EventStore, PeerManagerApi } from '../core/interfaces.js';
 import { createLogger } from '../core/log.js';
@@ -183,6 +184,7 @@ export async function runDaemon(projectDir: string, opts: { signals?: boolean } 
     logger.info('daemon started', { pid: process.pid, apiPort, peerPort });
 
     unsubscribe = store.onAppend((events) => scheduleFiles(events.some((e) => MATERIAL_TYPES.has(e.type))));
+    ensureDir(paths.inbox); // agents may write fallback drafts here with plain shell redirection
     ctx.importInbox();
     timers.inbox = setInterval(() => {
       try {

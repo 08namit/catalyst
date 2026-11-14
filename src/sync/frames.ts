@@ -34,6 +34,12 @@ export interface HelloFrame {
   addrs: string[];
   /** Per-author highest contiguous seq this node holds. */
   vector: Record<string, number>;
+  /**
+   * Per-author id of the event at `vector[author]`. Equal seq counts do not prove equal histories (a restored
+   * or copied .catalyst/ can re-use seqs); the receiver compares ids and raises a fork instead of assuming
+   * delivery. Optional for compatibility with older v1 peers.
+   */
+  heads?: Record<string, string>;
 }
 export interface EventsFrame {
   t: 'events';

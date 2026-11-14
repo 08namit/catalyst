@@ -71,8 +71,12 @@ export interface SyncStore {
   pendingOutbound(peer: string): number;
   /** Subscribe to newly applied events (local appends, peer ingests, imports). Returns unsubscribe. */
   onAppend(listener: (events: CatalystEvent[], source: AppendSource) => void): () => void;
-  /** Body for the next status frame to `peer` (advances an internal "sent" watermark). */
-  takeStatusFor(peer: string): PeerStatusBody;
+  /**
+   * Body for the next status frame to `peer` (advances an internal "sent" watermark). `fromStart` re-sends
+   * retrieval receipts from the beginning (used on every new connection, since a status frame can be lost
+   * with a dropped connection; receipts are idempotent at the receiver).
+   */
+  takeStatusFor(peer: string, opts?: { fromStart?: boolean }): PeerStatusBody;
   /** Store a peer's status frame (remote retrievals + sessions). */
   applyPeerStatus(peer: string, status: PeerStatusBody): void;
   /** Register a participant key learned during pairing (before its participant.joined event arrives). */
@@ -117,6 +121,8 @@ export interface EventStore extends SyncStore, InviteStore {
   toUpdateItem(e: StoredEvent): UpdateItem;
   // consumption
   recordRetrieval(session: string, eventIds: string[], at?: string): void;
+  /** Event ids this session has been shown (recorded retrievals), oldest first. */
+  retrievedBy(session: string): string[];
   getSessionCursor(session: string): number;
   setSessionCursor(session: string, cursor: number): void;
   isAcknowledgedByMe(eventId: string): boolean;

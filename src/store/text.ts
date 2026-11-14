@@ -90,6 +90,52 @@ export function itemLine(item: UpdateItem): string {
   return `- ${item.summary} — ${sanitizeForContext(item.authorName, 80)}, ${displayTs(item.ts)}, id ${item.id.slice(0, 8)}${auto}`;
 }
 
+/**
+ * Indented full-detail lines for records an agent must act on precisely (decisions, messages, progress).
+ * One-line summaries are cut at 300 chars, which loses contract details (status codes, fields), so these
+ * render the full text — bounded and sanitised, still framed as data.
+ */
+export function detailLines(e: CatalystEvent | undefined): string {
+  if (!e || e.v > PROTOCOL_VERSION) return '';
+  const out: string[] = [];
+  const add = (label: string, text: string | undefined, max: number) => {
+    if (text) out.push(`  ${label}: ${sanitizeForContext(text, max).replace(/\n/g, '\n    ')}`);
+  };
+  switch (e.type) {
+    case 'decision.recorded': {
+      const q = e.payload as PayloadOf<'decision.recorded'>;
+      add('Decision', q.decision, 1500);
+      add('Rationale', q.rationale, 600);
+      if (q.codeRefs?.length) add('Code refs', q.codeRefs.join(', '), 400);
+      if (q.alternatives?.length) add('Alternatives considered', q.alternatives.join('; '), 400);
+      if (e.supersedes.length) add('Revises', e.supersedes.map((id) => id.slice(0, 8)).join(', '), 200);
+      break;
+    }
+    case 'message.posted': {
+      const q = e.payload as PayloadOf<'message.posted'>;
+      add('Message', q.body, 1500);
+      if (q.kind === 'question') out.push(`  Reply with send_message {kind:"reply", replyTo:"${e.id}"}`);
+      break;
+    }
+    case 'conflict.resolved':
+      add('Resolution', (e.payload as PayloadOf<'conflict.resolved'>).resolution, 1500);
+      break;
+    case 'progress.reported': {
+      const q = e.payload as PayloadOf<'progress.reported'>;
+      if (q.evidence?.length) add('Evidence', q.evidence.join('; '), 600);
+      if (q.nextSteps?.length) add('Next steps', q.nextSteps.join('; '), 400);
+      if (q.branch || q.commit) add('Code', [q.branch && `branch ${q.branch}`, q.commit && `commit ${q.commit}`].filter(Boolean).join(', '), 200);
+      break;
+    }
+  }
+  return out.length ? '\n' + out.join('\n') : '';
+}
+
+/** itemLine plus full details for decisions/messages/progress. */
+export function detailedItemLine(item: UpdateItem, e: CatalystEvent | undefined): string {
+  return itemLine(item) + detailLines(e);
+}
+
 /** Freshness lines that never confuse "no new peer updates" with "peer unreachable" or "never connected". */
 export function syncLines(sync: SyncSummary): string[] {
   const lines: string[] = [];
@@ -128,6 +174,8 @@ export function syncLines(sync: SyncSummary): string[] {
 export interface Section {
   title: string;
   lines: string[];
+  /** Source event ids cited by each line (parallel to `lines`); used to report what was actually rendered. */
+  ids?: string[][];
   /** Shown when the section would otherwise be empty; omitted if undefined. */
   empty?: string;
 }
@@ -137,15 +185,33 @@ export interface Section {
  * so lower-priority sections are truncated first.
  */
 export function fitSections(head: string[], sections: Section[], footer: string[], maxChars: number): string {
+  return fitSectionsTracked(head, sections, footer, maxChars).text;
+}
+
+/**
+ * Like fitSections, but also reports which source ids made it into the text and, per section, how many lines
+ * were emitted — so callers record retrieval / advance cursors only for records the model actually saw.
+ */
+export function fitSectionsTracked(
+  head: string[],
+  sections: Section[],
+  footer: string[],
+  maxChars: number,
+): { text: string; emittedIds: string[]; emittedCounts: number[] } {
   const headText = head.join('\n');
   const footText = footer.join('\n');
   let budget = maxChars - headText.length - footText.length - 2;
   const out: string[] = [headText];
+  const emittedIds = new Set<string>();
+  const emittedCounts: number[] = [];
   for (const s of sections) {
+    let count = 0;
     const lines = s.lines.length > 0 ? s.lines : s.empty !== undefined ? [s.empty] : [];
-    if (lines.length === 0) continue;
     const title = `\n### ${s.title}`;
-    if (title.length + 1 > budget) break;
+    if (lines.length === 0 || title.length + 1 > budget) {
+      emittedCounts.push(0);
+      continue;
+    }
     const chunk: string[] = [title];
     let used = title.length + 1;
     for (let i = 0; i < lines.length; i++) {
@@ -162,12 +228,17 @@ export function fitSections(head: string[], sections: Section[], footer: string[
       }
       chunk.push(line);
       used += line.length + 1;
+      if (s.lines.length > 0) {
+        count++;
+        for (const id of s.ids?.[i] ?? []) emittedIds.add(id);
+      }
     }
+    emittedCounts.push(count);
     if (chunk.length === 1) continue;
     out.push(chunk.join('\n'));
     budget -= used;
   }
   out.push('\n' + footText);
   const text = out.join('\n');
-  return text.length > maxChars ? text.slice(0, maxChars - 1) + '…' : text;
+  return { text: text.length > maxChars ? text.slice(0, maxChars - 1) + '…' : text, emittedIds: [...emittedIds], emittedCounts };
 }

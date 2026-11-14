@@ -137,7 +137,8 @@ async function userPromptSubmit(ctx: Ctx): Promise<void> {
 }
 
 export function formatUnreadLine(u: UnreadSummary): string | null {
-  if (!(u.newSinceLastNotice > 0) && !(u.openConflicts > 0)) return null;
+  // Only announce when something NEW arrived; open conflicts ride along but never trigger a notice by themselves.
+  if (!(u.newSinceLastNotice > 0)) return null;
   const parts: string[] = [];
   if (u.newSinceLastNotice > 0) {
     const details = Object.entries(u.byType ?? {})

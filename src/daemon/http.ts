@@ -52,6 +52,8 @@ interface Req {
   client: Client;
   session: string;
   clientPid?: number;
+  /** Idempotency key header (x-catalyst-client-id), validated before use. */
+  clientId?: string;
 }
 
 export interface ApiServer {
@@ -192,6 +194,7 @@ async function handle(ctx: DaemonContext, req: IncomingMessage, res: ServerRespo
     client,
     session: String(req.headers['x-catalyst-session'] ?? '') || `${client}:anon`,
     ...(Number.isInteger(pid) && pid > 0 ? { clientPid: pid } : {}),
+    clientId: typeof req.headers['x-catalyst-client-id'] === 'string' ? req.headers['x-catalyst-client-id'] : undefined,
   };
   const result = route(ctx, r);
   send(res, 200, result);
@@ -203,7 +206,10 @@ function route(ctx: DaemonContext, r: Req): unknown {
   const key = `${r.method} ${r.path}`;
   if (r.method === 'POST' && r.path.startsWith('/api/tools/')) {
     const name = decodeURIComponent(r.path.slice('/api/tools/'.length));
-    return runTool(name, r.body, { store, sync: ctx.sync, session: r.session, sessionKind: KIND_BY_CLIENT[r.client], origin: ORIGIN_BY_CLIENT[r.client] }).result;
+    // Optional idempotency key for writes (MCP adapter sets it before dispatch so retries/drafts can't duplicate).
+    const rawKey = r.clientId;
+    const clientId = typeof rawKey === 'string' && /^[A-Za-z0-9:_.-]{8,100}$/.test(rawKey) ? rawKey : undefined;
+    return runTool(name, r.body, { store, sync: ctx.sync, session: r.session, sessionKind: KIND_BY_CLIENT[r.client], origin: ORIGIN_BY_CLIENT[r.client], clientId }).result;
   }
   switch (key) {
     case 'GET /api/status':

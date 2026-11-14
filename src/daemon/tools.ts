@@ -127,7 +127,7 @@ function publishResult(call: ToolCall, a: Appended, what: string, warnings: stri
 // ---------------------------------------------------------------------------
 function getBriefing(input: ToolInput<'get_briefing'>, call: ToolCall) {
   const briefing = buildBriefing(call.store, input, { sync: call.sync(), now: new Date() });
-  const ids = new Set([...briefing.sourceIds, ...briefing.unread.items.map((i) => i.id)]);
+  const ids = new Set(briefing.sourceIds); // only what was rendered into the text
   if (ids.size > 0) call.store.recordRetrieval(call.session, [...ids]);
   call.store.upsertSession({ id: call.session, kind: call.sessionKind, retrieved: true });
   return briefing;
