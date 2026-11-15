@@ -3,79 +3,84 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Catalyst — the communication layer for ai agents</title>
+<title>Catalyst: the communication layer for AI agents</title>
 <meta name="description" content="Catalyst connects two developers' Claude Code sessions with shared project knowledge over a direct, encrypted peer link. Catalyst v0.2 includes named subagents, a shared task queue, conversational setup and runtime recovery checkpoints.">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#E8EDEE">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Besley:wght@400..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="landing.css">
 <script src="script.js" defer></script>
-
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<div class="progress" aria-hidden="true"></div>
 <header class="nav"><div class="wrap">
   <a class="brand" href="index.html">Catalyst</a>
   <nav aria-label="Primary"><ul>
     <li><a href="#setup">Setup</a></li>
     <li><a href="#how">How it works</a></li>
-    <li><a href="#what">What it does</a></li>
+    <li><a href="#what">What it shares</a></li>
     <li><a href="#agents">Agents and recovery</a></li>
-    <li><a href="install.html">Install</a></li>
+    <li><a class="btn" href="install.html">Install</a></li>
   </ul></nav>
 </div></header>
-<nav class="rail" aria-label="Sections"><ul>
-  <li><a href="#setup" aria-label="Setup"></a></li>
-  <li><a href="#how" aria-label="How it works"></a></li>
-  <li><a href="#what" aria-label="What it does"></a></li>
-  <li><a href="#agents" aria-label="Agents and recovery"></a></li>
-  <li><a href="#about" aria-label="Handover"></a></li>
-</ul></nav>
 
 <main id="main">
-<section class="reaction-hero" aria-labelledby="hero-title">
-  <div class="layer-scene" aria-hidden="true">
-    <div class="layer-tilt">
-      <div class="flat-layer layer-1"><span>01 / goals</span><i></i><i></i><i></i></div>
-      <div class="flat-layer layer-2"><span>02 / decisions</span><i></i><i></i><i></i></div>
-      <div class="flat-layer layer-3"><span>03 / progress</span><i></i><i></i><i></i></div>
-      <div class="flat-layer layer-4"><span>04 / questions</span><i></i><i></i><i></i></div>
-      <div class="flat-layer layer-5"><span>05 / tasks</span><i></i><i></i><i></i></div>
-      <div class="flat-layer layer-6"><span>06 / context</span><i></i><i></i><i></i></div>
-      <div class="shared-layer"><span>CATALYST / SHARED CONTEXT</span><div class="shared-rule"></div><p>Many perspectives.<br>One shared direction.</p></div>
-    </div>
-  </div>
-  <div class="reaction-content">
-    <p class="reaction-eyebrow">Independent agents. One shared context.</p>
-    <h1 id="hero-title">Catalyst</h1>
-    <p class="reaction-tagline">the communication layer for ai agents</p>
-    <p class="reaction-product">Two developers. Two laptops. Shared project knowledge.<br>Named subagents. One task queue. Checkpoints for the next worker.</p>
-    <div class="reaction-actions">
-      <a class="reaction-primary" href="install.html">Get started</a>
-      <a class="reaction-secondary" href="#agents">Explore agent coordination</a>
-    </div>
+<section class="band hero"><div class="wrap">
+  <h1>Catalyst</h1>
+  <p class="hero-line">The communication layer for AI agents.</p>
+  <p class="lede">Catalyst connects two developers' Claude Code sessions over a direct, encrypted link, so every agent on both laptops works from the same goals, tasks and decisions.</p>
+  <div class="actions">
+    <a class="btn" href="install.html">Install Catalyst</a>
+    <a href="#how">How it works</a>
   </div>
 
-  <a class="reaction-scroll" href="#setup">Scroll to explore <span aria-hidden="true">↓</span></a>
-</section>
-
-<section id="setup" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>01</b> Setup · v0.2 on main</div>
-  <h2 class="stmt"><span class="beat a">Init.</span><span class="beat b">Pair.</span><span class="beat s">Join.</span></h2>
-  <p class="sub reveal">Install from main on both laptops, then pair your project. Each Claude Code lead can coordinate named subagents through the shared queue.</p>
-  <div class="trio reveal">
-    <div><h3>Init</h3><pre class="cmd">catalyst init --name "Tiam"</pre></div>
-    <div><h3>Pair</h3><pre class="cmd">catalyst pair</pre></div>
-    <div><h3>Join</h3><pre class="cmd">catalyst join cat1_… --name "Namit"</pre></div>
+  <div class="demo">
+    <p class="demo-intro">Try it. Send an update from either laptop, then disconnect the link and keep sending. Updates queue locally and replay when the link returns.</p>
+    <p class="small">A simulation that runs in your browser. Nothing is sent anywhere.</p>
+    <div class="sim" id="sim">
+      <div class="sim-grid">
+        <section class="panel panel-a" aria-labelledby="panelA">
+          <h3 id="panelA">Tiam's laptop</h3>
+          <ul id="logA" aria-label="Tiam's laptop context"></ul>
+        </section>
+        <div class="mid">
+          <div class="wire" aria-hidden="true"></div>
+          <p class="link-state" id="linkState">Link connected</p>
+          <button class="sbtn" id="sendA" type="button">Send from Tiam</button>
+          <button class="sbtn" id="sendB" type="button">Send from Namit</button>
+          <button class="sbtn" id="toggle" type="button" aria-pressed="false">Disconnect link</button>
+        </div>
+        <section class="panel panel-b" aria-labelledby="panelB">
+          <h3 id="panelB">Namit's laptop</h3>
+          <ul id="logB" aria-label="Namit's laptop context"></ul>
+        </section>
+      </div>
+      <p class="sim-status" id="simStatus" role="status" aria-live="polite"></p>
+    </div>
   </div>
-  <p class="small reveal" style="margin-top:20px">Compare the confirmation codes, then run <code>claude</code>. <a href="install.html">Full guide →</a></p>
 </div></section>
 
-<section id="how" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>02</b> How it works</div>
-  <h2 class="stmt"><span class="beat">No hosted service.</span><span class="beat s">Just peers.</span></h2>
-  <p class="sub reveal">A local daemon on each laptop. Direct TLS encryption over LAN or VPN. Every event signed by its author.</p>
-  <div class="arch reveal gap-lg" role="img" aria-label="Diagram. On each laptop, Claude Code connects through hooks and a stdio MCP adapter to a local daemon holding a SQLite log, a loopback API and a dashboard. The two daemons sync directly over a TLS 1.2 PSK link on LAN or VPN using signed events.">
+<section id="setup" class="band"><div class="wrap">
+  <div class="band-head">
+    <h2>Set up with three commands</h2>
+    <p class="lede">Install from main on both laptops, then pair your project. Each Claude Code lead can coordinate named subagents through the shared queue.</p>
+  </div>
+  <ol class="steps">
+    <li><h3>Init</h3><pre class="cmd">catalyst init --name "Tiam"</pre></li>
+    <li><h3>Pair</h3><pre class="cmd">catalyst pair</pre></li>
+    <li><h3>Join</h3><pre class="cmd">catalyst join cat1_… --name "Namit"</pre></li>
+  </ol>
+  <p class="mt-1">Compare the confirmation codes, then run <code>claude</code>. <a href="install.html">Read the full installation guide</a>.</p>
+</div></section>
+
+<section id="how" class="band band-ink"><div class="wrap">
+  <div class="band-head">
+    <h2>Two laptops talk directly. Nothing is hosted.</h2>
+    <p class="lede">A local daemon runs on each laptop. The two daemons sync over a TLS-encrypted link on your LAN or VPN, and every event is signed by its author.</p>
+  </div>
+  <div class="arch" role="img" aria-label="Diagram. On each laptop, Claude Code connects through hooks and a stdio MCP adapter to a local daemon holding a SQLite log, a loopback API and a dashboard. The two daemons sync directly over a TLS 1.2 PSK link on LAN or VPN using signed events.">
 <pre aria-hidden="true"> Laptop A                                                   Laptop B
  ┌───────────────────────────────┐                ┌───────────────────────────────┐
  │ Claude Code ─ hooks ──────┐   │                │   ┌────── hooks ─ Claude Code │
@@ -86,79 +91,100 @@
  │              dashboard        │                │   dashboard                   │
  └───────────────────────────────┘                └───────────────────────────────┘</pre>
   </div>
-
-  <h2 class="stmt md-size gap-lg" style="margin-top:120px"><span class="beat">Link drops?</span><span class="beat a">It queues.</span><span class="beat">Link back?</span><span class="beat b">It replays.</span></h2>
-  <div class="sim reveal" id="sim">
-    <div class="sim-top"><span>Try it</span><span class="tag">Illustrative simulation</span></div>
-    <div class="sim-body">
-      <div class="side a"><h3>Laptop A · local daemon</h3><ul id="logA" aria-label="Laptop A context"></ul></div>
-      <div class="mid">
-        <div class="wire" aria-hidden="true"></div>
-        <button class="sbtn" id="sendA" type="button">Send from A</button>
-        <button class="sbtn" id="sendB" type="button">Send from B</button>
-        <button class="sbtn" id="toggle" type="button" aria-pressed="false">Disconnect</button>
-      </div>
-      <div class="side b"><h3>Laptop B · local daemon</h3><ul id="logB" aria-label="Laptop B context"></ul></div>
+  <div class="cols-2 mt-3">
+    <div>
+      <h3>When the link drops, updates queue</h3>
+      <p>Both sessions keep working. New events are saved locally and queued for the other laptop. Local context survives disconnection; cloud models still need connectivity.</p>
     </div>
-    <p class="status" id="simStatus" role="status" aria-live="polite"></p>
+    <div>
+      <h3>When it returns, they replay</h3>
+      <p>Missed events replay in both directions in their original order. <a href="#sim">Try it in the demo at the top of the page</a>.</p>
+    </div>
   </div>
-  <p class="small reveal" style="margin-top:20px">Local context survives disconnection. Cloud models still need connectivity.</p>
 </div></section>
 
-<section id="what" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>03</b> What it does</div>
-  <h2 class="stmt"><span class="beat a">Goals.</span><span class="beat b">Tasks.</span><span class="beat s">Decisions.</span><span class="beat a">Progress.</span><span class="beat b">Questions.</span></h2>
-  <p class="sub reveal">Share project knowledge: goals, decisions, ownership, progress, blockers, questions and replies. Conversations, hidden reasoning and source files stay outside Catalyst. Git still moves the code.</p>
-  <div class="chips reveal" aria-label="Some MCP tools"><span>get_briefing</span><span>claim_task</span><span>publish_decision</span><span>publish_progress</span><span>send_message</span><span>resolve_conflict</span></div>
-  <div class="grid cols-2 reveal">
-    <div class="card"><h3>Keep conflicts visible</h3><p>Competing decisions and task claims stay visible until someone resolves them. History is preserved; timestamps do not pick a winner. Ownership is advisory.</p></div>
-    <div class="card"><h3>Know what reached an agent</h3><p>Saved locally, delivered, retrieved and acknowledged are separate states. A connected peer is not proof that Claude has read an update.</p></div>
+<section id="what" class="band"><div class="wrap">
+  <div class="band-head">
+    <h2>What Catalyst shares, and what it leaves alone</h2>
   </div>
-  <figure class="shot reveal gap-lg"><div class="shot-scroll" tabindex="0" role="region" aria-label="Dashboard screenshot (scrollable)"><img src="assets/dashboard-live.png" alt="Catalyst dashboard showing live data from a two-node demo" width="1440" height="3400" loading="lazy"></div><figcaption>The local dashboard, live data from a two-node demo.</figcaption></figure>
+  <div class="cols-2">
+    <div>
+      <h3>Shared between laptops</h3>
+      <ul class="what-list shared">
+        <li>Goals</li>
+        <li>Tasks and who owns them</li>
+        <li>Decisions</li>
+        <li>Progress and blockers</li>
+        <li>Questions and replies</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Stays where it is</h3>
+      <ul class="what-list stays">
+        <li>Conversations with Claude</li>
+        <li>Hidden reasoning</li>
+        <li>Source files (Git still moves the code)</li>
+      </ul>
+    </div>
+  </div>
+  <dl class="rows mt-3">
+    <div><dt>Conflicts stay visible</dt><dd>Competing decisions and task claims stay visible until someone resolves them. History is preserved; timestamps do not pick a winner. Ownership is advisory.</dd></div>
+    <div><dt>You can see what reached an agent</dt><dd>Saved locally, delivered, retrieved and acknowledged are separate states. A connected peer is not proof that Claude has read an update.</dd></div>
+  </dl>
+  <p class="mt-2">Agents use MCP tools such as <code>get_briefing</code>, <code>claim_task</code>, <code>publish_decision</code>, <code>publish_progress</code>, <code>send_message</code> and <code>resolve_conflict</code>.</p>
+  <figure class="shot mt-2"><div class="shot-scroll" tabindex="0" role="region" aria-label="Dashboard screenshot (scrollable)"><img src="assets/dashboard-live.png" alt="Catalyst dashboard showing live data from a two-node demo" width="1440" height="3400" loading="lazy"></div><figcaption>The local dashboard, showing live data from a two-node demo.</figcaption></figure>
 </div></section>
 
-<section id="agents" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>04</b> v0.2 · agents and recovery</div>
-  <h2 class="stmt"><span class="beat">Many agents.</span><span class="beat s">One queue.</span></h2>
-  <p class="sub reveal">One lead Claude Code session per developer, with several named subagents on each laptop. Everyone works from the same project context and task queue.</p>
-  <p class="note reveal"><strong>Available from the main branch.</strong> Named agents, the shared queue and runtime recovery are integrated. Interactive two-laptop validation remains pending.</p>
-  <div class="grid cols-2 reveal">
-    <div class="card"><h3>Every agent has a name</h3><p>See “Tiam / api” and “Namit / tests” across both laptops. Claims, decisions, progress, unread updates and acknowledgements are tracked per agent.</p></div>
-    <div class="card"><h3>Pick up the next ready task</h3><p>The lead posts tasks with dependencies and assignees. Free agents on either laptop claim ready work, finish it with evidence and take the next task.</p></div>
-    <div class="card"><h3>Set up by talking to Claude</h3><p>After a one-time installation, ask Claude to set up Catalyst and invite your teammate. Your teammate joins with the private invitation; you compare confirmation codes.</p></div>
-    <div class="card"><h3>Ask the right agent</h3><p>Address questions to a person or an agent such as “Namit/api”. Waiting agents can call <code>wait_for_updates</code> for replies or new work. Hooks cannot wake an idle session.</p></div>
-    <div class="card"><h3>Leave a checkpoint for the next worker</h3><p>Record plans, milestones, evidence and next steps with <code>checkpoint_task</code>. On a graceful stop, unfinished work returns to the queue with its saved context. Details stay in ignored <code>.catalyst/</code> runtime storage and sync to your teammate.</p></div>
-    <div class="card"><h3>Keep ownership through an outage</h3><p>An unreachable peer keeps its claims. Queue workers continue with eligible local work rather than assuming the disconnected agent has stopped. A hard crash cannot guarantee a final handoff; Git still transfers the code.</p></div>
+<section id="agents" class="band"><div class="wrap">
+  <div class="band-head">
+    <h2>Many agents work from one queue</h2>
+    <p class="lede">One lead Claude Code session per developer, with several named subagents on each laptop. Everyone works from the same project context and task queue.</p>
   </div>
-  <div class="chips reveal" aria-label="Agent coordination MCP tools"><span>post_tasks</span><span>take_next_task</span><span>complete_task</span><span>checkpoint_task</span><span>wait_for_updates</span><span>catalyst_status</span></div>
-  <div class="card gap-lg reveal">
+  <div class="note"><p><strong>Available from the main branch.</strong> Named agents, the shared queue and runtime recovery are integrated. Interactive two-laptop validation remains pending.</p></div>
+  <dl class="rows mt-2">
+    <div><dt>Every agent has a name</dt><dd>See “Tiam / api” and “Namit / tests” across both laptops. Claims, decisions, progress, unread updates and acknowledgements are tracked per agent.</dd></div>
+    <div><dt>Pick up the next ready task</dt><dd>The lead posts tasks with dependencies and assignees. Free agents on either laptop claim ready work, finish it with evidence and take the next task.</dd></div>
+    <div><dt>Set up by talking to Claude</dt><dd>After a one-time installation, ask Claude to set up Catalyst and invite your teammate. Your teammate joins with the private invitation; you compare confirmation codes.</dd></div>
+    <div><dt>Ask the right agent</dt><dd>Address questions to a person or an agent such as “Namit/api”. Waiting agents can call <code>wait_for_updates</code> for replies or new work. Hooks cannot wake an idle session.</dd></div>
+    <div><dt>Leave a checkpoint for the next worker</dt><dd>Record plans, milestones, evidence and next steps with <code>checkpoint_task</code>. On a graceful stop, unfinished work returns to the queue with its saved context. Details stay in ignored <code>.catalyst/</code> runtime storage and sync to your teammate.</dd></div>
+    <div><dt>Keep ownership through an outage</dt><dd>An unreachable peer keeps its claims. Queue workers continue with eligible local work rather than assuming the disconnected agent has stopped. A hard crash cannot guarantee a final handoff; Git still transfers the code.</dd></div>
+  </dl>
+  <p class="mt-2">Coordination tools include <code>post_tasks</code>, <code>take_next_task</code>, <code>complete_task</code>, <code>checkpoint_task</code>, <code>wait_for_updates</code> and <code>catalyst_status</code>.</p>
+  <div class="mt-3">
     <h3>Give the team a shared plan</h3>
-    <p>Once both laptops are connected, tell Claude:</p>
+    <p class="mt-1">Once both laptops are connected, tell Claude:</p>
     <pre class="cmd">Build the notes app. Split it into tasks, post them to Catalyst,
 and use 3 subagents to work through the queue.</pre>
-    <p class="small" style="margin-top:16px">Run <code>catalyst</code> for a short summary of the connection, agents, queue and conflicts. Ask Claude to pause or resume sync when needed.</p>
+    <p class="small mt-1">Run <code>catalyst</code> for a short summary of the connection, agents, queue and conflicts. Ask Claude to pause or resume sync when needed.</p>
   </div>
-  <div class="grid cols-2 reveal">
-    <div class="card"><h3>What has been verified</h3><p>The integrated build passes 197 unit and integration tests and 26 end-to-end tests, including checkpoint replay and takeover between two real local daemons. The earlier headless multiagent run completed all three posted tasks.</p></div>
-    <div class="card"><h3>What still needs validation</h3><p>Interactive installation and conversational setup, hooks after restart, and a physical two-laptop run with multiple agents remain pending. Protocol v2 cannot sync with v0.1 data: create fresh projects and pair again when upgrading.</p></div>
+  <div class="cols-2 mt-3">
+    <div>
+      <h3>What has been verified</h3>
+      <p>The integrated build passes 197 unit and integration tests and 26 end-to-end tests, including checkpoint replay and takeover between two real local daemons. The earlier headless multiagent run completed all three posted tasks.</p>
+    </div>
+    <div>
+      <h3>What still needs validation</h3>
+      <p>Interactive installation and conversational setup, hooks after restart, and a physical two-laptop run with multiple agents remain pending. Protocol v2 cannot sync with v0.1 data: create fresh projects and pair again when upgrading.</p>
+    </div>
   </div>
-  <p class="small reveal" style="margin-top:24px">Verification and limitations are recorded in <code>IMPORTANT.md</code>, <code>DEMO.md</code> and the recovery guides. <a href="install.html#recovery">Recovery and compatibility →</a></p>
+  <p class="small mt-2">Verification and limitations are recorded in <code>IMPORTANT.md</code>, <code>DEMO.md</code> and the recovery guides. <a href="install.html#recovery">Read about recovery and compatibility</a>.</p>
 </div></section>
 
-<section id="about" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>05</b> The handover</div>
-  <h2 class="stmt"><span class="beat">Developers and agents,</span><span class="beat s">together.</span><span class="beat">Even apart.</span></h2>
-  <p class="sub reveal">Different schedules. Same picture.</p>
-  <p class="mono-xl reveal">IMPORTANT<span>.md</span></p>
-  <p class="sub reveal">A generated handover with the goal, task owners, decisions, conflicts, bugs, evidence and next steps. Synced replicas produce identical text; your own notes stay outside the generated block.</p>
-  <p class="small reveal" style="margin-top:20px">Built for two developers on a reachable LAN or VPN. No relay or NAT traversal. Each developer uses their own Claude access; model usage is billed as usual.</p>
+<section id="about" class="band"><div class="wrap">
+  <div class="band-head">
+    <h2>A handover that writes itself</h2>
+    <p class="lede">Developers and agents keep the same picture, even on different schedules.</p>
+  </div>
+  <p class="filename">IMPORTANT.md</p>
+  <p>A generated handover with the goal, task owners, decisions, conflicts, bugs, evidence and next steps. Synced replicas produce identical text; your own notes stay outside the generated block.</p>
+  <p class="small">Built for two developers on a reachable LAN or VPN. No relay or NAT traversal. Each developer uses their own Claude access; model usage is billed as usual.</p>
 </div></section>
-
 </main>
 
 <footer><div class="wrap">
-  <p>Catalyst v0.2 · Agent coordination and runtime recovery · MIT licensed</p>
-  <p><a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a> · <a href="install.html">Installation</a></p>
+  <p>Catalyst v0.2, MIT licensed.</p>
+  <p><a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a></p>
+  <p><a href="install.html">Installation guide</a></p>
 </div></footer>
 </body>
 </html>

@@ -1,0 +1,40 @@
+/* Install page: page-specific rules only. Tokens and shared classes live in styles.css. */
+
+/* page head: tighter than a full band */
+.page-head{padding:clamp(40px,6vw,80px) 0 clamp(56px,7vw,96px)}
+.page-head h1{margin-bottom:clamp(24px,3vw,40px)}
+.page-head .lede{margin-bottom:clamp(20px,2.5vw,32px)}
+
+/* steps follow the page head closely */
+.page-head + .band{padding-top:clamp(8px,1.5vw,20px)}
+/* the band's own top rule already separates the page head from step 1 */
+.page-head + .band .steps > li:first-child{border-top:0}
+
+/* a heading that exists for the document outline only */
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* spacing between command blocks and neighbouring text */
+main pre.cmd + p,
+main pre.cmd + pre.cmd{margin-top:1.1rem}
+main p + pre.cmd,
+main ul + pre.cmd{margin-top:1.1rem}
+
+/* step content: no trailing gap, lists keep their own width */
+.steps > li > div > :last-child{margin-bottom:0}
+.steps > li > div > ul{padding-left:1.3em}
+
+/* Developer A / Developer B */
+.steps .cols-2{margin-top:1.5rem}
+.steps .cols-2 > div > :last-child{margin-bottom:0}
+.steps .cols-2 p{margin-top:1.1rem}
+.steps .cols-2 pre.cmd + p{margin-top:1.1rem}
+.steps .cols-2{grid-template-columns:minmax(0,1fr)}
+h4{display:flex;align-items:center;gap:.6em;margin:0 0 .9rem;font:600 1.2rem/1.3 var(--text);color:var(--ink)}
+h4::before{content:"";flex:none;width:1.1rem;height:1.1rem;border:2px solid var(--ink)}
+h4.dev-a::before{background:var(--a)}
+h4.dev-b::before{background:var(--b)}
+
+/* recovery */
+#recovery ol{margin-bottom:1.5em}
+#recovery .note{margin-top:clamp(32px,4vw,48px)}
+.note h3{font-size:1.5rem;margin-bottom:.6em}
