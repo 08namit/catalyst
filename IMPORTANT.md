@@ -9,8 +9,9 @@
 - User explicitly authorized checking, merging and pushing the completed features to main. This supersedes
   the earlier instruction to keep v0.2/recovery separate. Integrates `ac5d01f` (v0.2), `1f272b4` (recovery),
   and `8c493e8` (website updates) with Namit's existing website commit `c90ffbe` on origin/main.
-- Integration was assembled and validated in `/private/tmp/catalyst-main-integration` for a normal push to main.
-  Do not force-push. Keep the historical feature branches and untracked `notes-demo/`.
+- Integration was assembled and validated in `/private/tmp/catalyst-main-integration`, then pushed normally
+  to origin/main at tested integration `7e53e84`; the remote SHA was verified. Original checkout is now main.
+  Keep the historical merged feature branches and untracked `notes-demo/`.
 - Website and demo install instructions now describe v0.2/recovery on main, while retaining the pending
   physical two-device validation. No website hosting configuration was found; Git push does not prove deployment.
 - `project.md` was absent; project sources are README, PLAN, PROTOCOL, DEMO, this handover and docs/.
@@ -67,14 +68,14 @@
 - Old configured Codex MCP server failed (`codex mcp-server` unavailable in that CLI); companion plugin was used.
 
 ## Branches and provenance
-- main: integration target; includes Namit's website commit already present on origin/main.
+- main: v0.2, recovery and website integration published to origin/main; includes Namit's website commit.
 - v0.2-agents (`ac5d01f`), feature/agent-recovery (`1f272b4`), website/project-update (`8c493e8`): retained
   historical branches, incorporated by this integration. They are local; origin exposed only main at the last fetch.
 - Previous notes said these branches were unmerged/not pushed. That was accurate before this explicit merge request.
 
 ## Next steps
-1. Publish the validated integration with a normal main push and verify origin/main matches; subsequent
-   sessions should fetch before extending it. Local feature branches are retained as merged history.
+1. Keep local main and origin/main synchronized; fetch before extending. All three local feature branches
+   are retained as fully merged history. The only published remote branch at verification was main.
 2. Tiam + Namit install the same main build on macOS/same Wi-Fi/same Claude model; re-pair fresh v2 projects.
 3. Run docs/EXPERIMENT.md: Git+tracked-notes baseline only, no chat; 180-second peer-sync pause with Claude/Git
    online; retain raw measurements/failed trials outside Git. No comparison measurements are claimed yet.
