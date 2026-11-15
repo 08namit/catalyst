@@ -9,7 +9,7 @@
 - User explicitly authorized checking, merging and pushing the completed features to main. This supersedes
   the earlier instruction to keep v0.2/recovery separate. Integrates `ac5d01f` (v0.2), `1f272b4` (recovery),
   and `8c493e8` (website updates) with Namit's existing website commit `c90ffbe` on origin/main.
-- Integration is prepared in `/private/tmp/catalyst-main-integration`; validate before the normal main push.
+- Integration was assembled and validated in `/private/tmp/catalyst-main-integration` for a normal push to main.
   Do not force-push. Keep the historical feature branches and untracked `notes-demo/`.
 - Website and demo install instructions now describe v0.2/recovery on main, while retaining the pending
   physical two-device validation. No website hosting configuration was found; Git push does not prove deployment.
@@ -35,7 +35,9 @@
 - Recovery source milestone: typecheck, 197 unit/integration tests, build, 26 end-to-end tests, existing
   two-node demo and six Python results-validator tests passed. End-to-end tests use real local daemons with
   simulated agent calls; they are not physical two-device or live-model comparison results.
-- Final integration checks: pending this session's run; replace this line with the actual result before push.
+- Final integration checks passed: typecheck, 197 tests, build, 26 e2e tests, six Python tests, JavaScript
+  syntax checks, website links/assets/anchors/duplicate IDs, and diff checks. Package-lock project version
+  corrected from 0.1.0 to 0.2.0 without changing dependency resolution.
 - Earlier v0.2 evidence: 186 tests, 25 e2e; two headless lead sessions each spawning two subagents completed
   3/3 queue tasks; resulting sample code passed 14 tests. Interactive setup was not established by that run.
 - Historical evidence conflict retained: original PLAN said physical two-laptop verification was untested;
@@ -71,7 +73,8 @@
 - Previous notes said these branches were unmerged/not pushed. That was accurate before this explicit merge request.
 
 ## Next steps
-1. Finish final integration checks and normal push to main; verify origin/main matches the tested commit.
+1. Publish the validated integration with a normal main push and verify origin/main matches; subsequent
+   sessions should fetch before extending it. Local feature branches are retained as merged history.
 2. Tiam + Namit install the same main build on macOS/same Wi-Fi/same Claude model; re-pair fresh v2 projects.
 3. Run docs/EXPERIMENT.md: Git+tracked-notes baseline only, no chat; 180-second peer-sync pause with Claude/Git
    online; retain raw measurements/failed trials outside Git. No comparison measurements are claimed yet.
