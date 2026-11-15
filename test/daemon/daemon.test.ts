@@ -120,7 +120,7 @@ describe('daemon tools', () => {
     const goal = await api<PublishResult>(info, 'POST', '/api/tools/set_goal', { title: 'Ship login flow', successCriteria: ['tests pass'] });
     expect(goal.status).toBe(200);
     expect(goal.body.text).toContain('Saved locally');
-    expect(goal.body.text).toContain('no peer paired yet');
+    expect(goal.body.text).toContain('no teammate has joined yet');
     expect(goal.body.event.type).toBe('goal.set');
 
     // Simulated peer claims "api-auth" (touching src/api) before us.
@@ -303,5 +303,23 @@ describe('unread summary', () => {
     const other = await api<UnreadSummary>(info, 'GET', '/api/unread?session=s2');
     expect(other.body.newSinceLastNotice).toBe(3);
     expect(h.store.getSessionCursor('s1')).toBe(0);
+  });
+});
+
+describe('checkpoint-only snapshot refresh', () => {
+  it('refreshes the ignored fallback after a milestone without exporting that content to IMPORTANT.md', async () => {
+    const dir = makeProject();
+    const { info } = await start(dir);
+    const paths = projectPaths(dir);
+    await api(info, 'POST', '/api/tools/post_tasks', { tasks: [{ taskId: 'checkpoint-refresh', title: 'Checkpoint refresh' }] });
+    await api(info, 'POST', '/api/tools/take_next_task', { taskId: 'checkpoint-refresh' });
+    const saved = await api(info, 'POST', '/api/tools/checkpoint_task', {
+      taskId: 'checkpoint-refresh', status: 'in_progress', summary: 'LATEST_RUNTIME_ONLY_MILESTONE', nextSteps: ['PRIVATE_NEXT_ACTION'],
+    });
+    expect(saved.status).toBe(200);
+    await expect.poll(() => existsSync(paths.snapshotJson) ? readFileSync(paths.snapshotJson, 'utf8') : '', { timeout: 3000 }).toContain('LATEST_RUNTIME_ONLY_MILESTONE');
+    await api(info, 'POST', '/api/handover');
+    const handover = readFileSync(paths.handover, 'utf8');
+    expect(handover).not.toMatch(/LATEST_RUNTIME_ONLY_MILESTONE|PRIVATE_NEXT_ACTION/);
   });
 });

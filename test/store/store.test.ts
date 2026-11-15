@@ -170,7 +170,7 @@ describe('ingest', () => {
       { ...base, seq: 2, lc: 2, type: 'future.thing', payload: { anything: [1, 2] }, supersedes: [] },
       idA.privateKey,
     );
-    const v2 = signEvent({ ...base, v: 2, seq: 3, lc: 3, type: 'goal.set', payload: { shape: 'new' }, supersedes: [] }, idA.privateKey);
+    const v2 = signEvent({ ...base, v: 3, seq: 3, lc: 3, type: 'goal.set', payload: { shape: 'new' }, supersedes: [] }, idA.privateKey);
     const b = makeNode(projectId, 'Namit');
     const r = b.ingest([base, future, v2], { via: 'peer', peer: idA.participantId });
     expect(r.accepted).toHaveLength(3);

@@ -19,11 +19,11 @@ describe('decision conflicts', () => {
     const { a, b } = makePair();
     const v1 = a.append(decision('api/format', 'Format', 'JSON')).event;
     sync(a, b);
-    // concurrent revisions: both supersede v1 by default
+    // concurrent revisions: by default a writer revises only its own head (Namit's does not supersede Tiam's v1)
     const va = a.append(decision('api/format', 'Format', 'JSON:API')).event;
     const vb = b.append(decision('api/format', 'Format', 'protobuf')).event;
     expect(va.supersedes).toEqual([v1.id]);
-    expect(vb.supersedes).toEqual([v1.id]);
+    expect(vb.supersedes).toEqual([]);
     sync(a, b);
     sync(b, a);
     for (const s of [a, b]) {
@@ -88,12 +88,43 @@ describe('claims', () => {
 });
 
 describe('projection', () => {
+  it('projects task checkpoints as runtime-only progress and replicates them', () => {
+    const { a, b } = makePair();
+    a.append({ type: 'task.created', payload: { taskId: 'parser', title: 'Parser' }, origin: 'agent' });
+    a.append({
+      type: 'task.checkpoint',
+      payload: { taskId: 'parser', status: 'in_progress', summary: 'Plan the parser fix', nextSteps: ['Add an empty input case'] },
+      refs: { task: 'parser' },
+      origin: 'agent',
+    });
+    sync(a, b);
+    expect(b.getState().tasks.find((t) => t.taskId === 'parser')?.latestProgress).toMatchObject([
+      { runtimeOnly: true, status: 'in_progress', summary: 'Plan the parser fix', nextSteps: ['Add an empty input case'] },
+    ]);
+  });
+
+  it('does not let a later peer checkpoint reopen a completed task', () => {
+    const { a, b } = makePair();
+    a.append({ type: 'task.created', payload: { taskId: 'parser', title: 'Parser' }, origin: 'agent' });
+    sync(a, b);
+    a.append({ type: 'progress.reported', payload: { taskId: 'parser', status: 'done', summary: 'Parser fixed' }, origin: 'agent' });
+    sync(a, b);
+    b.append({ type: 'task.checkpoint', payload: { taskId: 'parser', status: 'in_progress', summary: 'Late checkpoint from partition' }, refs: { task: 'parser' }, origin: 'agent' });
+    sync(b, a);
+    const task = a.getState().tasks.find((t) => t.taskId === 'parser')!;
+    expect(task.status).toBe('done');
+    expect(task.latestProgress.some((p) => p.runtimeOnly && p.summary === 'Late checkpoint from partition')).toBe(true);
+  });
+
   it('is identical for the same event set regardless of arrival order', () => {
     const { a, b } = makePair();
     a.append({ type: 'goal.set', payload: { title: 'Ship', successCriteria: ['tests pass'] }, origin: 'agent' });
     a.append({ type: 'task.created', payload: { taskId: 'api', title: 'API' }, origin: 'agent' });
     a.append({ type: 'task.claimed', payload: { taskId: 'api', scope: 'server', paths: ['src/api/**'] }, origin: 'agent' });
     b.append({ type: 'task.claimed', payload: { taskId: 'api', scope: 'client' }, origin: 'agent' });
+    a.append({ type: 'agent.registered', payload: { agent: 'sub1', name: 'docs' }, origin: 'system', agent: 'sub1' });
+    a.append({ type: 'task.claimed', payload: { taskId: 'docs', scope: 'readme' }, origin: 'agent', agent: 'sub1' });
+    a.append({ type: 'task.created', payload: { taskId: 'ui', title: 'UI', dependsOn: ['api'] }, origin: 'agent', agent: 'sub1' });
     b.append(decision('api/format', 'Format', 'JSON'));
     a.append(decision('api/format', 'Format', 'XML'));
     const q = b.append({ type: 'message.posted', payload: { kind: 'question', body: 'Port?', to: a.me }, origin: 'agent' }).event;

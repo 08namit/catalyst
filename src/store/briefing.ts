@@ -1,24 +1,30 @@
 /**
  * Deterministic, bounded briefing (no embeddings): conflicts → questions for me → my claims → relevant
- * current records → unread peer updates. Does NOT record retrieval; the caller does (with sourceIds).
+ * current records → unread updates. Per agent: "me" is (participant, ctx.agent); sibling agents' records count
+ * like a peer's. Does NOT record retrieval; the caller does (with sourceIds).
  */
-import { sanitizeForContext, type CatalystEvent } from '../core/protocol.js';
+import { LEAD_AGENT, ownerKey, sanitizeForContext, type CatalystEvent } from '../core/protocol.js';
 import type { Briefing, SyncSummary, ToolInput, UpdateItem } from '../core/api.js';
-import type { EventStore } from '../core/interfaces.js';
+import type { EventStore, StoredEvent } from '../core/interfaces.js';
 import { pathsOverlap } from './paths-match.js';
+import { summarizeQueue } from './queue.js';
 import { DATA_NOT_INSTRUCTIONS, detailedItemLine, displayTs, fitSectionsTracked, itemLine, syncLines, type Section } from './text.js';
 
 const DEFAULT_MAX_CHARS = 6000;
 const UNREAD_CAP = 15;
 const SECTION_CAP = 10;
+const AGENTS_CAP = 8;
 
-export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'>, ctx: { sync: SyncSummary; now: Date }): Briefing {
+export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'>, ctx: { sync: SyncSummary; now: Date; agent: string }): Briefing {
   const state = store.getState();
   const me = store.me;
+  const myKey = ownerKey(me, ctx.agent);
   const meName = state.participants.find((p) => p.id === me)?.name ?? me;
+  const meAgent = state.agents.find((a) => a.address === myKey);
+  const toItem = (s: StoredEvent): UpdateItem => ({ ...store.toUpdateItem(s), acknowledgedByMe: store.isAcknowledgedByMe(s.event.id, ctx.agent) });
   const item = (id: string): UpdateItem | null => {
     const s = store.getEvent(id);
-    return s ? store.toUpdateItem(s) : null;
+    return s ? toItem(s) : null;
   };
   const items = (ids: string[]) => ids.map(item).filter((x): x is UpdateItem => x !== null);
 
@@ -26,21 +32,21 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
   const conflicts = state.conflicts;
   const shown = new Set<string>(conflicts.flatMap((c) => c.heads.map((h) => h.id)));
 
-  // (2) unanswered questions addressed to me (or everyone), newest first
+  // (2) unanswered questions addressed to everyone, my participant or this agent (not written by this agent), newest first
   const questionsForMe = items(
     state.questions
-      .filter((q) => !q.answered && q.author !== me && (q.to === undefined || q.to === 'all' || q.to === me))
+      .filter((q) => !q.answered && ownerKey(q.author, q.agent) !== myKey && (q.to === undefined || q.to === 'all' || q.to === me || q.to === myKey))
       .map((q) => q.id)
       .reverse()
       .slice(0, SECTION_CAP),
   );
   questionsForMe.forEach((q) => shown.add(q.id));
 
-  // (3) my live claims
+  // (3) this agent's live claims
   const myClaims = items(
     state.tasks
       .flatMap((t) => t.claims)
-      .filter((c) => c.owner === me && !shown.has(c.id))
+      .filter((c) => c.ownerKey === myKey && !shown.has(c.id))
       .map((c) => c.id)
       .slice(0, SECTION_CAP),
   );
@@ -66,32 +72,38 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
     if (!s) continue;
     const score = relevance(s.event, input, searchHits);
     if (focused && score === 0) continue;
-    scored.push({ item: store.toUpdateItem(s), score });
+    scored.push({ item: toItem(s), score });
   }
   scored.sort((a, b) => b.score - a.score || b.item.cursor - a.item.cursor);
   const relevant = scored.slice(0, SECTION_CAP).map((x) => x.item);
   relevant.forEach((r) => shown.add(r.id));
 
-  // (5) unread: peer events not acknowledged by me, newest first
+  // (5) unread: events not written and not acknowledged by this agent, newest first
   const unreadAll = store
-    .listSince(0, { excludeAuthor: me })
-    .filter((s) => s.event.type !== 'ack.recorded' && !store.isAcknowledgedByMe(s.event.id));
-  const unreadItems = unreadAll
-    .slice(-UNREAD_CAP)
-    .reverse()
-    .map((s) => store.toUpdateItem(s));
+    .listSince(0, { excludeAgent: { author: me, agent: ctx.agent } })
+    .filter((s) => s.event.type !== 'ack.recorded' && !store.isAcknowledgedByMe(s.event.id, ctx.agent));
+  const unreadItems = unreadAll.slice(-UNREAD_CAP).reverse().map(toItem);
 
   const notices = buildNotices(ctx.sync, state.forks.length, conflicts.length);
 
   // text
   const head: string[] = [
     `## Catalyst briefing — ${state.project ? sanitizeForContext(state.project.name, 120) : 'project'}`,
-    `You: ${sanitizeForContext(meName, 80)} (${me}) · generated ${ctx.now.toISOString()}`,
+    `You: ${sanitizeForContext(meAgent?.displayName ?? meName, 120)} (${me}${ctx.agent === LEAD_AGENT ? '' : `, agent ${ctx.agent}`}) · generated ${ctx.now.toISOString()}`,
     ...syncLines(ctx.sync),
   ];
+  const activeAgents = state.agents.filter((a) => a.active);
+  if (activeAgents.some((a) => a.agent !== LEAD_AGENT || a.claims.length > 0)) {
+    const shownAgents = activeAgents.slice(0, AGENTS_CAP).map((a) => `${sanitizeForContext(a.displayName, 80)}${a.claims.length ? ` (${a.claims.slice(0, 3).join(', ')}${a.claims.length > 3 ? ', …' : ''})` : ''}`);
+    head.push(`Agents: ${shownAgents.join('; ')}${activeAgents.length > AGENTS_CAP ? `; +${activeAgents.length - AGENTS_CAP} more` : ''}`);
+  }
+  if (state.tasks.length > 0) {
+    const q = summarizeQueue(state);
+    head.push(`Queue: ${q.done}/${q.total} done, ${q.inProgress} in progress, ${q.ready} ready, ${q.blocked} blocked (take_next_task picks the next ready task).`);
+  }
   const g = state.goal.current;
   if (g) {
-    head.push(`Goal: ${sanitizeForContext(g.title, 200)} — ${sanitizeForContext(g.authorName, 80)}, id ${g.id.slice(0, 8)}${state.goal.conflict ? ' (⚠ conflicting goal versions, see below)' : ''}`);
+    head.push(`Goal: ${sanitizeForContext(g.title, 200)} — ${sanitizeForContext(g.agentName, 80)}, id ${g.id.slice(0, 8)}${state.goal.conflict ? ' (⚠ conflicting goal versions, see below)' : ''}`);
     if (g.successCriteria.length) head.push(`Success criteria: ${g.successCriteria.map((c) => sanitizeForContext(c, 200)).join('; ')}`);
   } else {
     head.push('Goal: not set yet.');
@@ -106,7 +118,7 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
         (c) =>
           `- ${c.scope} \`${c.key}\` has ${c.heads.length} competing versions:\n` +
           c.heads
-            .map((h) => `  - ${sanitizeForContext(h.summary, 300)} — ${sanitizeForContext(h.authorName, 80)}, ${displayTs(h.ts)}, id ${h.id.slice(0, 8)}${h.origin === 'hook' ? ' (auto-captured)' : ''}`)
+            .map((h) => `  - ${sanitizeForContext(h.summary, 300)} — ${sanitizeForContext(h.agentName, 80)}, ${displayTs(h.ts)}, id ${h.id.slice(0, 8)}${h.origin === 'hook' ? ' (auto-captured)' : ''}`)
             .join('\n') +
           `\n  Hint: ${c.hint}`,
       ),
@@ -121,10 +133,10 @@ export function buildBriefing(store: EventStore, input: ToolInput<'get_briefing'
       empty: focused ? (conflicts.length ? '- Nothing beyond the open conflicts above matched.' : '- Nothing matched; try a broader query.') : undefined,
     },
     {
-      title: `Unread peer updates (${unreadAll.length} unacknowledged, newest first)`,
+      title: `Unread updates from peers and your other agents (${unreadAll.length} unacknowledged, newest first)`,
       lines: unreadItems.map(itemLine),
       ids: unreadItems.map((u) => [u.id]),
-      empty: '- No unacknowledged peer updates.',
+      empty: '- No unacknowledged updates.',
     },
   ];
   const footer = [

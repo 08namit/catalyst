@@ -22,7 +22,7 @@ describe('decision in force', () => {
     sync(b, a);
     const block = renderHandoverBlock(a.getState());
     expect(block).toMatch(/\*\*api\/create-task\*\* — Bearer auth contract.*conflicting revisions pending/);
-    const briefing = buildBriefing(a, { topic: 'api/create-task' }, { sync: syncSummary('connected'), now: new Date() });
+    const briefing = buildBriefing(a, { topic: 'api/create-task' }, { sync: syncSummary('connected'), now: new Date(), agent: 'lead' });
     expect(briefing.relevant.map((r) => r.id)).toContain(accepted.id);
     expect(briefing.text).toContain('Bearer auth contract details');
   });

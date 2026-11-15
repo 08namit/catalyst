@@ -13,6 +13,30 @@ export interface SourceRef {
   /** Display timestamp from the author's clock. */
   ts: string;
   origin: Origin;
+  /** Agent key inside `author` (LEAD_AGENT when the event has none). */
+  agent: string;
+  /** Display name: "<authorName>" for the lead, "<authorName> / <agent name>" for subagents. */
+  agentName: string;
+}
+
+/** One agent of one participant (from agent.registered + any event it authored). */
+export interface AgentView {
+  participant: string;
+  participantName: string;
+  /** Agent key (ID_PATTERNS.agent). */
+  agent: string;
+  /** "participant/agent" (ownerKey). */
+  address: string;
+  /** Short name, e.g. "api" or "general-purpose-2"; "lead" for the main session. */
+  name: string;
+  /** "<participantName> / <name>" (just participantName for the lead). */
+  displayName: string;
+  agentType?: string;
+  /** false once an agent.registered with active:false is the latest for this agent. */
+  active: boolean;
+  isMe: boolean;
+  /** Task ids this agent currently holds a live claim on. */
+  claims: string[];
 }
 
 export interface ParticipantView {
@@ -32,8 +56,14 @@ export interface GoalVersion extends SourceRef {
 
 export interface ClaimView extends SourceRef {
   taskId: string;
+  /** Owning participant. */
   owner: string;
+  /** Owning participant's display name plus agent, e.g. "Tiam / api". */
   ownerName: string;
+  /** Owning agent key inside `owner` (for resolutions: payload.ownerAgent). */
+  ownerAgent: string;
+  /** ownerKey(owner, ownerAgent). */
+  ownerKey: string;
   scope: string;
   paths: string[];
   note?: string;
@@ -42,6 +72,8 @@ export interface ClaimView extends SourceRef {
 }
 
 export interface ProgressView extends SourceRef {
+  /** Recovery checkpoint: share through Catalyst runtime, never export its content to project handover files. */
+  runtimeOnly?: boolean;
   taskId?: string;
   status: string;
   summary: string;
@@ -58,15 +90,26 @@ export interface TaskView {
   description?: string;
   paths: string[];
   createdBy?: SourceRef;
-  /** Live claim heads (not superseded / released). >1 owner ⇒ conflict. */
+  /** Live claim heads (not superseded / released). >1 distinct ownerKey ⇒ conflict. */
   claims: ClaimView[];
+  /** Distinct owning participants. */
   owners: string[];
-  /** Latest progress per author (deterministic order), newest last. */
+  /** Distinct owning agents (ownerKey "participant/agent"). */
+  ownerKeys: string[];
+  /** Latest progress per (author, agent) (deterministic order), newest last. */
   latestProgress: ProgressView[];
   /** Status from the latest progress overall in deterministic order, or "unclaimed"/"claimed". */
   status: string;
   openBlockers: string[];
   claimConflict: boolean;
+  // ---- queue (from the latest task.created) ----
+  dependsOn: string[];
+  /** Participant id or "any". */
+  assignee: string;
+  /** Queue position: payload.order, else the deterministic index of the first task.created. */
+  order: number;
+  /** true when the task has been posted to the queue (has a task.created) and every dependency is "done". */
+  ready: boolean;
 }
 
 export interface DecisionView extends SourceRef {
@@ -101,6 +144,7 @@ export interface ConflictView {
 export interface MessageView extends SourceRef {
   kind: 'question' | 'reply' | 'notification';
   body: string;
+  /** Participant id, agent address "p_…/agent", or "all". */
   to?: string;
   replyTo?: string;
   refs: EventRefs;
@@ -138,6 +182,8 @@ export interface ProjectState {
   project: { id: string; name: string; description?: string } | null;
   me: string;
   participants: ParticipantView[];
+  /** Every known agent (lead of each participant always included), deterministic order. */
+  agents: AgentView[];
   goal: { current: GoalVersion | null; heads: GoalVersion[]; conflict: boolean };
   tasks: TaskView[];
   decisions: TopicView[];
@@ -149,8 +195,10 @@ export interface ProjectState {
   generalProgress: ProgressView[];
   /** Most recent activity first, max 50. */
   activity: ActivityView[];
-  /** eventId → participant ids that acknowledged it. */
+  /** eventId → participant ids that acknowledged it (any of their agents). */
   acknowledgements: Record<string, string[]>;
+  /** eventId → agent addresses ("participant/agent") that acknowledged it. */
+  agentAcknowledgements: Record<string, string[]>;
   forks: ForkAlarm[];
   /** Latest MATERIAL event in deterministic order (used for "last update" in IMPORTANT.md). */
   lastMaterial: SourceRef | null;

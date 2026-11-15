@@ -7,8 +7,8 @@
     "name": "Tiam",
     "nonce": "78377b525757b494427f89014f97d799",
     "pid": 48213,
-    "version": "0.1.0",
-    "protocol": 1,
+    "version": "0.2.0",
+    "protocol": 2,
     "apiPort": 51723,
     "peerPort": 47811,
     "startedAt": "2026-11-14T13:42:10.000Z"
@@ -38,6 +38,86 @@
         "isMe": false
       }
     ],
+    "agents": [
+      {
+        "participant": "p_4c2dbbafa3e4534493cac8ff",
+        "participantName": "Tiam",
+        "agent": "lead",
+        "address": "p_4c2dbbafa3e4534493cac8ff/lead",
+        "name": "lead",
+        "displayName": "Tiam",
+        "active": true,
+        "isMe": true,
+        "claims": []
+      },
+      {
+        "participant": "p_4c2dbbafa3e4534493cac8ff",
+        "participantName": "Tiam",
+        "agent": "a7a6a241124692d30",
+        "address": "p_4c2dbbafa3e4534493cac8ff/a7a6a241124692d30",
+        "name": "api",
+        "displayName": "Tiam / api",
+        "agentType": "general-purpose",
+        "active": true,
+        "isMe": true,
+        "claims": [
+          "api-create-task"
+        ]
+      },
+      {
+        "participant": "p_4c2dbbafa3e4534493cac8ff",
+        "participantName": "Tiam",
+        "agent": "a91c07e5d2b44f018",
+        "address": "p_4c2dbbafa3e4534493cac8ff/a91c07e5d2b44f018",
+        "name": "docs",
+        "displayName": "Tiam / docs",
+        "agentType": "general-purpose",
+        "active": true,
+        "isMe": true,
+        "claims": [
+          "readme-update"
+        ]
+      },
+      {
+        "participant": "p_6ae0107a3cc7a824414b71ef",
+        "participantName": "Namit",
+        "agent": "lead",
+        "address": "p_6ae0107a3cc7a824414b71ef/lead",
+        "name": "lead",
+        "displayName": "Namit",
+        "active": true,
+        "isMe": false,
+        "claims": [
+          "readme-update"
+        ]
+      },
+      {
+        "participant": "p_6ae0107a3cc7a824414b71ef",
+        "participantName": "Namit",
+        "agent": "b3c1d9f0e8a7c6b54",
+        "address": "p_6ae0107a3cc7a824414b71ef/b3c1d9f0e8a7c6b54",
+        "name": "cli",
+        "displayName": "Namit / cli",
+        "agentType": "general-purpose",
+        "active": true,
+        "isMe": false,
+        "claims": [
+          "client-add-command"
+        ]
+      },
+      {
+        "participant": "p_6ae0107a3cc7a824414b71ef",
+        "participantName": "Namit",
+        "agent": "b52e4a1c9d7f80312",
+        "address": "p_6ae0107a3cc7a824414b71ef/b52e4a1c9d7f80312",
+        "name": "tests",
+        "displayName": "Namit / tests",
+        "agentType": "general-purpose",
+        "active": false,
+        "isMe": false,
+        "claims": []
+      }
+    ],
     "goal": {
       "current": {
         "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
@@ -52,7 +132,9 @@
           "POST /tasks creates a task and returns it",
           "client add \"<title>\" works against the server",
           "npm test passes on both branches after merge"
-        ]
+        ],
+        "agent": "lead",
+        "agentName": "Tiam"
       },
       "heads": [
         {
@@ -68,7 +150,9 @@
             "POST /tasks creates a task and returns it",
             "client add \"<title>\" works against the server",
             "npm test passes on both branches after merge"
-          ]
+          ],
+          "agent": "lead",
+          "agentName": "Tiam"
         }
       ],
       "conflict": false
@@ -87,7 +171,9 @@
           "authorName": "Tiam",
           "seq": 4,
           "ts": "2026-11-14T12:07:10.000Z",
-          "origin": "agent"
+          "origin": "agent",
+          "agent": "lead",
+          "agentName": "Tiam"
         },
         "claims": [
           {
@@ -99,12 +185,16 @@
             "origin": "agent",
             "taskId": "api-create-task",
             "owner": "p_4c2dbbafa3e4534493cac8ff",
-            "ownerName": "Tiam",
+            "ownerName": "Tiam / api",
             "scope": "Implement POST /tasks in sample/server",
             "paths": [
               "sample/server/**"
             ],
-            "viaResolution": false
+            "viaResolution": false,
+            "agent": "a7a6a241124692d30",
+            "agentName": "Tiam / api",
+            "ownerAgent": "a7a6a241124692d30",
+            "ownerKey": "p_4c2dbbafa3e4534493cac8ff/a7a6a241124692d30"
           }
         ],
         "owners": [
@@ -129,12 +219,21 @@
               "Wait for api/create-task conflict resolution before merging"
             ],
             "branch": "tiam/api-create-task",
-            "commit": "4e1c9a7"
+            "commit": "4e1c9a7",
+            "agent": "a7a6a241124692d30",
+            "agentName": "Tiam / api"
           }
         ],
         "status": "in_progress",
         "openBlockers": [],
-        "claimConflict": false
+        "claimConflict": false,
+        "ownerKeys": [
+          "p_4c2dbbafa3e4534493cac8ff/a7a6a241124692d30"
+        ],
+        "dependsOn": [],
+        "assignee": "p_4c2dbbafa3e4534493cac8ff",
+        "order": 0,
+        "ready": true
       },
       {
         "taskId": "client-add-command",
@@ -148,7 +247,9 @@
           "authorName": "Namit",
           "seq": 2,
           "ts": "2026-11-14T12:22:10.000Z",
-          "origin": "agent"
+          "origin": "agent",
+          "agent": "lead",
+          "agentName": "Namit"
         },
         "claims": [
           {
@@ -160,12 +261,16 @@
             "origin": "agent",
             "taskId": "client-add-command",
             "owner": "p_6ae0107a3cc7a824414b71ef",
-            "ownerName": "Namit",
+            "ownerName": "Namit / cli",
             "scope": "Add `add \"<title>\"` command to sample/client",
             "paths": [
               "sample/client/**"
             ],
-            "viaResolution": false
+            "viaResolution": false,
+            "agent": "b3c1d9f0e8a7c6b54",
+            "agentName": "Namit / cli",
+            "ownerAgent": "b3c1d9f0e8a7c6b54",
+            "ownerKey": "p_6ae0107a3cc7a824414b71ef/b3c1d9f0e8a7c6b54"
           }
         ],
         "owners": [
@@ -187,14 +292,23 @@
             ],
             "evidence": [],
             "nextSteps": [],
-            "branch": "namit/client-add"
+            "branch": "namit/client-add",
+            "agent": "b3c1d9f0e8a7c6b54",
+            "agentName": "Namit / cli"
           }
         ],
         "status": "blocked",
         "openBlockers": [
           "api/create-task has two conflicting decisions"
         ],
-        "claimConflict": false
+        "claimConflict": false,
+        "ownerKeys": [
+          "p_6ae0107a3cc7a824414b71ef/b3c1d9f0e8a7c6b54"
+        ],
+        "dependsOn": [],
+        "assignee": "p_6ae0107a3cc7a824414b71ef",
+        "order": 1,
+        "ready": true
       },
       {
         "taskId": "readme-update",
@@ -216,7 +330,9 @@
           "paths": [
             "sample/README.md"
           ],
-          "viaResolution": false
+          "viaResolution": false,
+          "agent": "a91c07e5d2b44f018",
+          "agentName": "Tiam / docs"
         },
         "claims": [
           {
@@ -228,12 +344,16 @@
             "origin": "agent",
             "taskId": "readme-update",
             "owner": "p_4c2dbbafa3e4534493cac8ff",
-            "ownerName": "Tiam",
+            "ownerName": "Tiam / docs",
             "scope": "Document the new endpoint in sample/README.md",
             "paths": [
               "sample/README.md"
             ],
-            "viaResolution": false
+            "viaResolution": false,
+            "agent": "a91c07e5d2b44f018",
+            "agentName": "Tiam / docs",
+            "ownerAgent": "a91c07e5d2b44f018",
+            "ownerKey": "p_4c2dbbafa3e4534493cac8ff/a91c07e5d2b44f018"
           },
           {
             "id": "51f02fede8506e7acca789c343e60ec1c3f8ccc00d2c4a209d06246a4790bd8e",
@@ -249,7 +369,11 @@
             "paths": [
               "sample/README.md"
             ],
-            "viaResolution": false
+            "viaResolution": false,
+            "agent": "lead",
+            "agentName": "Namit",
+            "ownerAgent": "lead",
+            "ownerKey": "p_6ae0107a3cc7a824414b71ef/lead"
           }
         ],
         "owners": [
@@ -259,7 +383,47 @@
         "latestProgress": [],
         "status": "claimed",
         "openBlockers": [],
-        "claimConflict": true
+        "claimConflict": true,
+        "ownerKeys": [
+          "p_4c2dbbafa3e4534493cac8ff/a91c07e5d2b44f018",
+          "p_6ae0107a3cc7a824414b71ef/lead"
+        ],
+        "dependsOn": [],
+        "assignee": "any",
+        "order": 2,
+        "ready": true
+      },
+      {
+        "taskId": "e2e-create-task",
+        "title": "End-to-end test: create a task from the CLI",
+        "description": "Run the CLI `add` command against the real server and check the task is listed.",
+        "paths": [
+          "sample/test/e2e/**"
+        ],
+        "createdBy": {
+          "id": "e7c1a0b2d3f4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0",
+          "author": "p_4c2dbbafa3e4534493cac8ff",
+          "authorName": "Tiam",
+          "seq": 14,
+          "ts": "2026-11-14T16:28:10.000Z",
+          "origin": "agent",
+          "agent": "lead",
+          "agentName": "Tiam"
+        },
+        "claims": [],
+        "owners": [],
+        "ownerKeys": [],
+        "latestProgress": [],
+        "status": "unclaimed",
+        "openBlockers": [],
+        "claimConflict": false,
+        "dependsOn": [
+          "api-create-task",
+          "client-add-command"
+        ],
+        "assignee": "any",
+        "order": 3,
+        "ready": false
       }
     ],
     "decisions": [
@@ -288,7 +452,9 @@
             "refs": {
               "topic": "api/create-task",
               "task": "api-create-task"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Tiam"
           },
           {
             "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
@@ -308,7 +474,9 @@
             "refs": {
               "topic": "api/create-task",
               "task": "client-add-command"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Namit"
           }
         ],
         "history": [
@@ -334,7 +502,9 @@
             "refs": {
               "topic": "api/create-task",
               "task": "api-create-task"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Tiam"
           },
           {
             "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
@@ -354,7 +524,9 @@
             "refs": {
               "topic": "api/create-task",
               "task": "client-add-command"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Namit"
           }
         ],
         "conflict": true
@@ -383,7 +555,9 @@
             ],
             "refs": {
               "topic": "server/storage"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Tiam"
           }
         ],
         "history": [
@@ -404,7 +578,9 @@
             "supersedes": [],
             "refs": {
               "topic": "server/storage"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Tiam"
           },
           {
             "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
@@ -427,7 +603,9 @@
             ],
             "refs": {
               "topic": "server/storage"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Tiam"
           }
         ],
         "conflict": false
@@ -445,7 +623,9 @@
             "seq": 9,
             "ts": "2026-11-14T15:07:10.000Z",
             "origin": "agent",
-            "summary": "{title} + Authorization: Bearer, 201 returns the task"
+            "summary": "{title} + Authorization: Bearer, 201 returns the task",
+            "agent": "lead",
+            "agentName": "Tiam"
           },
           {
             "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
@@ -454,7 +634,9 @@
             "seq": 5,
             "ts": "2026-11-14T15:09:10.000Z",
             "origin": "agent",
-            "summary": "(proposed) {title, due?} + X-Api-Key, 201 returns {id}"
+            "summary": "(proposed) {title, due?} + X-Api-Key, 201 returns {id}",
+            "agent": "lead",
+            "agentName": "Namit"
           }
         ],
         "hint": "Agree on one version, then call resolve_conflict with scope \"decision\" and key \"api/create-task\"."
@@ -470,7 +652,9 @@
             "seq": 6,
             "ts": "2026-11-14T14:42:10.000Z",
             "origin": "agent",
-            "summary": "claimed: document the new endpoint"
+            "summary": "claimed: document the new endpoint",
+            "agent": "a91c07e5d2b44f018",
+            "agentName": "Tiam / docs"
           },
           {
             "id": "51f02fede8506e7acca789c343e60ec1c3f8ccc00d2c4a209d06246a4790bd8e",
@@ -479,7 +663,9 @@
             "seq": 4,
             "ts": "2026-11-14T14:44:10.000Z",
             "origin": "agent",
-            "summary": "claimed: document the add command"
+            "summary": "claimed: document the add command",
+            "agent": "lead",
+            "agentName": "Namit"
           }
         ],
         "hint": "Decide who owns readme-update, then resolve_conflict with scope \"claim\" and the agreed owner."
@@ -500,7 +686,9 @@
           "topic": "api/create-task"
         },
         "replies": [],
-        "answered": false
+        "answered": false,
+        "agent": "lead",
+        "agentName": "Tiam"
       },
       {
         "id": "438fcf7e5d81fc5e2b36ceb3a000ddb4415d920c2c3e45091f6b085eaae77429",
@@ -511,7 +699,7 @@
         "origin": "agent",
         "kind": "question",
         "body": "Should POST /tasks return the whole task or just the id? The CLI prints the created title.",
-        "to": "p_4c2dbbafa3e4534493cac8ff",
+        "to": "p_4c2dbbafa3e4534493cac8ff/a7a6a241124692d30",
         "refs": {
           "topic": "api/create-task"
         },
@@ -529,10 +717,14 @@
             "replyTo": "438fcf7e5d81fc5e2b36ceb3a000ddb4415d920c2c3e45091f6b085eaae77429",
             "refs": {
               "topic": "api/create-task"
-            }
+            },
+            "agent": "lead",
+            "agentName": "Tiam"
           }
         ],
-        "answered": true
+        "answered": true,
+        "agent": "lead",
+        "agentName": "Namit"
       }
     ],
     "notifications": [
@@ -547,7 +739,9 @@
         "body": "Draft imported while the daemon was restarting: README section outline ready.",
         "refs": {
           "task": "readme-update"
-        }
+        },
+        "agent": "lead",
+        "agentName": "Tiam"
       },
       {
         "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
@@ -560,7 +754,9 @@
         "body": "Pushed tiam/api-create-task; tests green locally.",
         "refs": {
           "task": "api-create-task"
-        }
+        },
+        "agent": "lead",
+        "agentName": "Tiam"
       }
     ],
     "issues": [
@@ -574,7 +770,9 @@
         "kind": "bug",
         "title": "GET /tasks returns 200 with HTML on unknown routes",
         "detail": "Unknown paths should return 404 JSON.",
-        "status": "open"
+        "status": "open",
+        "agent": "lead",
+        "agentName": "Namit"
       },
       {
         "id": "379d5eca555470ac2ddddc00e0270e8de55b02d1c74190c0b0953a126462ffbb",
@@ -593,10 +791,15 @@
           "seq": 15,
           "ts": "2026-11-14T15:57:10.000Z",
           "origin": "agent",
-          "note": "Port is configurable via PORT."
-        }
+          "note": "Port is configurable via PORT.",
+          "agent": "lead",
+          "agentName": "Tiam"
+        },
+        "agent": "lead",
+        "agentName": "Tiam"
       }
     ],
+    "generalProgress": [],
     "activity": [
       {
         "id": "2d10696d0e758405a8000218ec77851d027c920b447cc355541eea494df1e9d3",
@@ -611,7 +814,9 @@
         "paths": [
           "sample/client/index.js",
           "sample/test/client.test.js"
-        ]
+        ],
+        "agent": "lead",
+        "agentName": "Namit"
       },
       {
         "id": "6ec566bd0f5d393defd053e35b3b940dc4b0a103980b6c4fcbb90bfde316e218",
@@ -630,7 +835,9 @@
         ],
         "paths": [
           "sample/server/index.js"
-        ]
+        ],
+        "agent": "lead",
+        "agentName": "Tiam"
       }
     ],
     "acknowledgements": {
@@ -641,6 +848,14 @@
         "p_6ae0107a3cc7a824414b71ef"
       ]
     },
+    "agentAcknowledgements": {
+      "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0": [
+        "p_6ae0107a3cc7a824414b71ef/b3c1d9f0e8a7c6b54"
+      ],
+      "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca": [
+        "p_6ae0107a3cc7a824414b71ef/b3c1d9f0e8a7c6b54"
+      ]
+    },
     "forks": [],
     "lastMaterial": {
       "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
@@ -648,7 +863,9 @@
       "authorName": "Tiam",
       "seq": 13,
       "ts": "2026-11-14T16:27:10.000Z",
-      "origin": "agent"
+      "origin": "agent",
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     "eventCount": 27,
     "opaqueCount": 0
@@ -739,7 +956,9 @@
         "deliveredTo": [],
         "retrievedBy": [],
         "acknowledgedBy": []
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
@@ -760,7 +979,9 @@
         "deliveredTo": [],
         "retrievedBy": [],
         "acknowledgedBy": []
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "1fb70e0e726ae647a48b2b59a4d10ed32ee743d416c26a49e0615c0935d75a80",
@@ -786,7 +1007,9 @@
         ],
         "retrievedBy": [],
         "acknowledgedBy": []
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "6ec566bd0f5d393defd053e35b3b940dc4b0a103980b6c4fcbb90bfde316e218",
@@ -819,7 +1042,9 @@
           }
         ],
         "acknowledgedBy": []
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "35b57a1cda48e54d2e122b46e8669b2bcbdfeb0098ee7e73ee58c86762036ddb",
@@ -850,7 +1075,9 @@
           }
         ],
         "acknowledgedBy": []
-      }
+      },
+      "agent": "a7a6a241124692d30",
+      "agentName": "Tiam / api"
     },
     {
       "id": "0e663ea0e411fd7c55ea93c25d3e7531341abc42d420653151dc6670d19fb9f7",
@@ -884,7 +1111,9 @@
             "at": "2026-11-14T16:03:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0",
@@ -920,7 +1149,9 @@
             "at": "2026-11-14T15:38:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
@@ -957,7 +1188,9 @@
             "at": "2026-11-14T15:13:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
@@ -993,7 +1226,9 @@
             "at": "2026-11-14T14:48:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "a91c07e5d2b44f018",
+      "agentName": "Tiam / docs"
     },
     {
       "id": "379d5eca555470ac2ddddc00e0270e8de55b02d1c74190c0b0953a126462ffbb",
@@ -1027,7 +1262,9 @@
             "at": "2026-11-14T14:18:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
@@ -1063,7 +1300,9 @@
             "at": "2026-11-14T13:28:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe",
@@ -1099,7 +1338,9 @@
             "at": "2026-11-14T12:38:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "a332d65e094548072ac3c5c2a5c3daf5b409b25dee09c582986b88d8e51d9b34",
@@ -1138,7 +1379,9 @@
             "at": "2026-11-14T12:14:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "a7a6a241124692d30",
+      "agentName": "Tiam / api"
     },
     {
       "id": "5bbe14e439a6e2f4387e2e408a90b5c95696ca547d9f5a42555b03ba02839e3f",
@@ -1174,7 +1417,9 @@
             "at": "2026-11-14T12:13:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
@@ -1208,7 +1453,9 @@
             "at": "2026-11-14T12:08:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "83a0788d01b698544613c70c88a60c199a3f49835e38d1b93efcf3eb86847ad0",
@@ -1242,7 +1489,9 @@
             "at": "2026-11-14T11:48:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "b1c00d428c1d6bb0e5701d4f461239ce53ee29b4137ae4eba5692a4423e84ee5",
@@ -1276,7 +1525,9 @@
             "at": "2026-11-14T11:48:10.000Z"
           }
         ]
-      }
+      },
+      "agent": "lead",
+      "agentName": "Tiam"
     }
   ],
   "recent": [
@@ -1293,7 +1544,9 @@
         "task": "readme-update"
       },
       "summary": "Notification from Tiam: Draft imported while the daemon was restarting",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "147bc64be9187e1dd1fed8228c72290e3e039081b015e635e8eb9d84f8c89895",
@@ -1308,7 +1561,9 @@
         "task": "api-create-task"
       },
       "summary": "Notification from Tiam: Pushed tiam/api-create-task; tests green locally.",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "1fb70e0e726ae647a48b2b59a4d10ed32ee743d416c26a49e0615c0935d75a80",
@@ -1323,7 +1578,9 @@
         "topic": "api/create-task"
       },
       "summary": "Question from Tiam: Can you live with the bearer-token header?",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "2d10696d0e758405a8000218ec77851d027c920b447cc355541eea494df1e9d3",
@@ -1341,7 +1598,9 @@
         ]
       },
       "summary": "Edited sample/client/index.js, sample/test/client.test.js",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "fc298faedbf349adb0b30dc73710663f9b5a9fe50ed5a247438a4661e58766cb",
@@ -1356,7 +1615,9 @@
         "task": "client-add-command"
       },
       "summary": "Progress client-add-command (blocked): request format depends on api/create-task",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "b3c1d9f0e8a7c6b54",
+      "agentName": "Namit / cli"
     },
     {
       "id": "6ec566bd0f5d393defd053e35b3b940dc4b0a103980b6c4fcbb90bfde316e218",
@@ -1373,7 +1634,9 @@
         ]
       },
       "summary": "Commit 4e1c9a7 server: POST /tasks with bearer auth",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "35b57a1cda48e54d2e122b46e8669b2bcbdfeb0098ee7e73ee58c86762036ddb",
@@ -1388,7 +1651,9 @@
         "task": "api-create-task"
       },
       "summary": "Progress api-create-task (in_progress): POST /tasks handler written behind the bearer check",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "a7a6a241124692d30",
+      "agentName": "Tiam / api"
     },
     {
       "id": "0e663ea0e411fd7c55ea93c25d3e7531341abc42d420653151dc6670d19fb9f7",
@@ -1401,7 +1666,9 @@
       "type": "issue.resolved",
       "refs": {},
       "summary": "Resolved risk: Port is configurable via PORT.",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "7bc17cbe4d921ac0d697a2e6cdb29f7729c522d77a02702c2036d601dbe2771c",
@@ -1414,7 +1681,9 @@
       "type": "issue.reported",
       "refs": {},
       "summary": "Bug: GET /tasks returns 200 with HTML on unknown routes",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "abbff9366eb9a3ff720c9bcb17a0073a846c1bd9030d4114bf88fdcd96b9a59e",
@@ -1427,7 +1696,9 @@
       "type": "ack.recorded",
       "refs": {},
       "summary": "Namit acknowledged 2 updates",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "e01d9922a408cfd11c5e579d880b15eb8270883f18f08b4043cbc2536e9096d0",
@@ -1442,7 +1713,9 @@
         "topic": "api/create-task"
       },
       "summary": "Reply from Tiam: Whole task: {id, title, done}. Status 201.",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "438fcf7e5d81fc5e2b36ceb3a000ddb4415d920c2c3e45091f6b085eaae77429",
@@ -1457,7 +1730,9 @@
         "topic": "api/create-task"
       },
       "summary": "Question from Namit: Should POST /tasks return the whole task or just the id?",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "fd18eefdb0ab9047a631fb9122aac997cadadd90fc65d0d361cf9df8fdcd8a6d",
@@ -1473,7 +1748,9 @@
         "task": "client-add-command"
       },
       "summary": "Decision api/create-task (proposed): POST /tasks takes {title, due?} with X-Api-Key",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "25fac217d1910e669262b6a94ebabf5b6ac8052c058e80032f7043b125746ad0",
@@ -1489,7 +1766,9 @@
         "task": "api-create-task"
       },
       "summary": "Decision api/create-task: POST /tasks takes {title} with a bearer token",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "51f02fede8506e7acca789c343e60ec1c3f8ccc00d2c4a209d06246a4790bd8e",
@@ -1504,7 +1783,9 @@
         "task": "readme-update"
       },
       "summary": "Namit claimed readme-update",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "8c3f15860c47f37f7118267ff2af1b111dac1c2bab176fd05d686c254a96b6db",
@@ -1519,7 +1800,9 @@
         "task": "readme-update"
       },
       "summary": "Tiam claimed readme-update",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "a91c07e5d2b44f018",
+      "agentName": "Tiam / docs"
     },
     {
       "id": "379d5eca555470ac2ddddc00e0270e8de55b02d1c74190c0b0953a126462ffbb",
@@ -1532,7 +1815,9 @@
       "type": "issue.reported",
       "refs": {},
       "summary": "Risk: Port 4317 may collide with other local services",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "d83b8bd62fbc45c872e92513215a1c8222f47d2fc3ef01dd9b0b542896e497ca",
@@ -1547,7 +1832,9 @@
         "topic": "server/storage"
       },
       "summary": "Decision server/storage: In-memory store with incremental ids (revises 1)",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "221a76c10aea4fe0cdd77745594281bc357d3cc01bef443541a39a325688edfe",
@@ -1562,7 +1849,9 @@
         "topic": "server/storage"
       },
       "summary": "Decision server/storage: Keep tasks in memory",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "0f0627f69759e03bdfb95d5e366d3bb3ebce8fbcd6aea09a8c11a06437ebc2db",
@@ -1580,7 +1869,9 @@
         ]
       },
       "summary": "Namit claimed client-add-command",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "b3c1d9f0e8a7c6b54",
+      "agentName": "Namit / cli"
     },
     {
       "id": "c06d38800a576ab91caaef0cd35d29170035d481c61f56d40e3c0b4a5ace7644",
@@ -1595,7 +1886,9 @@
         "task": "client-add-command"
       },
       "summary": "Task client-add-command: CLI `add` command",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "a332d65e094548072ac3c5c2a5c3daf5b409b25dee09c582986b88d8e51d9b34",
@@ -1613,7 +1906,9 @@
         ]
       },
       "summary": "Tiam claimed api-create-task",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "a7a6a241124692d30",
+      "agentName": "Tiam / api"
     },
     {
       "id": "5bbe14e439a6e2f4387e2e408a90b5c95696ca547d9f5a42555b03ba02839e3f",
@@ -1628,7 +1923,9 @@
         "task": "api-create-task"
       },
       "summary": "Task api-create-task: POST /tasks endpoint",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "6140f3ccced1cc17e8242764f27feb67abe9a252aecf4bf1d3440a2696369df3",
@@ -1641,7 +1938,9 @@
       "type": "goal.set",
       "refs": {},
       "summary": "Goal: Ship task creation in Pocket Tasks (API + CLI)",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "aa3d173328f41f73a595cf3c3c073319ee90863280037dbb2ba623be9ec773c6",
@@ -1654,7 +1953,9 @@
       "type": "participant.joined",
       "refs": {},
       "summary": "Namit joined",
-      "acknowledgedByMe": true
+      "acknowledgedByMe": true,
+      "agent": "lead",
+      "agentName": "Namit"
     },
     {
       "id": "83a0788d01b698544613c70c88a60c199a3f49835e38d1b93efcf3eb86847ad0",
@@ -1667,7 +1968,9 @@
       "type": "participant.joined",
       "refs": {},
       "summary": "Tiam joined",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     },
     {
       "id": "b1c00d428c1d6bb0e5701d4f461239ce53ee29b4137ae4eba5692a4423e84ee5",
@@ -1680,7 +1983,9 @@
       "type": "project.created",
       "refs": {},
       "summary": "Project \"Pocket Tasks\" created",
-      "acknowledgedByMe": false
+      "acknowledgedByMe": false,
+      "agent": "lead",
+      "agentName": "Tiam"
     }
   ],
   "fixture": true

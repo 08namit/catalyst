@@ -28,7 +28,7 @@ const ORIGIN_LABEL = {
 const PEER_TONE = { connected: 'ok', connecting: 'warn', unreachable: 'bad', paused: 'warn', never_connected: 'muted' };
 const STATUS_TONE = {
   done: 'ok', in_progress: 'info', in_review: 'info', blocked: 'bad', abandoned: 'muted',
-  not_started: 'muted', unclaimed: 'muted', claimed: 'info',
+  not_started: 'muted', unclaimed: 'muted', claimed: 'info', ready: 'info', waiting: 'muted',
 };
 
 // ---------------------------------------------------------------------------
@@ -96,12 +96,20 @@ function ago(iso, fallback = 'never') {
   return h('time', { datetime: iso, title: Number.isNaN(d.getTime()) ? iso : d.toLocaleString() }, relTime(iso));
 }
 
+/** Display name of a participant id, an agent address "p_…/agent", "all" or "any". */
 function nameOf(id) {
   if (!id || id === 'all') return 'everyone';
+  if (id === 'any') return 'anyone';
+  if (id.includes('/')) {
+    const a = data?.state?.agents?.find((x) => x.address === id);
+    return a ? a.displayName : `${nameOf(id.split('/')[0])} / ${id.split('/')[1].slice(0, 8)}`;
+  }
   const p = data?.state?.participants?.find((x) => x.id === id) ?? data?.sync?.peers?.find((x) => x.participant === id);
   return p ? p.name : shortId(id);
 }
-const byLine = (ref) => h('span', { class: 'by' }, ref.authorName || nameOf(ref.author), ' · ', ago(ref.ts));
+/** "Tiam / api" for a subagent's record, "Tiam" for the lead's. */
+const whoOf = (ref) => ref.agentName || ref.authorName || nameOf(ref.author);
+const byLine = (ref) => h('span', { class: 'by' }, whoOf(ref), ' · ', ago(ref.ts));
 
 function section(id, title, count, { wide = false, tone = '', note = null } = {}, ...body) {
   return h('section', { class: `card${wide ? ' wide' : ''}${tone ? ` card-${tone}` : ''}`, id, 'aria-labelledby': `${id}-h` },
@@ -161,7 +169,7 @@ function secConnection() {
       h('li', null, 'Peer port ', mono(String(sync.peerPort)))),
     forks,
     sync.peers.length ? h('div', { class: 'peers' }, peers)
-      : empty('Not paired yet. Run `catalyst pair` here, then `catalyst join <invite>` on the other laptop.'),
+      : empty('Not paired yet. Ask Claude to "invite my teammate to Catalyst" and send the invite to your teammate.'),
     h('p', { class: 'note' }, 'A connection heartbeat is not proof an agent is actively working.'));
 }
 
@@ -171,7 +179,7 @@ function secConflicts() {
     list.length ? h('ul', { class: 'list' }, list.map((c) => h('li', null,
       h('div', { class: 'row' }, badge('CONFLICT', 'bad'), badge(c.scope, 'muted'), mono(c.key)),
       h('ul', { class: 'heads-list' }, c.heads.map((hd) => h('li', null,
-        h('strong', null, hd.authorName), ': ', hd.summary, ' ', h('span', { class: 'muted' }, '· ', ago(hd.ts), ' · ', mono(shortId(hd.id)))))),
+        h('strong', null, whoOf(hd)), ': ', hd.summary, ' ', h('span', { class: 'muted' }, '· ', ago(hd.ts), ' · ', mono(shortId(hd.id)))))),
       h('p', { class: 'hint' }, c.hint))))
       : empty('No unresolved conflicts.'));
 }
@@ -195,6 +203,54 @@ function secGoal() {
       mono(p.id)))));
 }
 
+/** Distinct owning agents of a task ("Tiam / api"). */
+function ownerNames(t) {
+  return [...new Set(t.claims.map((c) => c.ownerName || nameOf(c.ownerKey || c.owner)))];
+}
+
+function secAgents() {
+  const { agents = [], participants } = data.state;
+  const working = agents.filter((a) => a.active && a.agent !== 'lead').length;
+  return section('agents', 'Agents', agents.length, { note: `${working} subagent${working === 1 ? '' : 's'} working` },
+    agents.length ? participants.map((p) => {
+      const mine = agents.filter((a) => a.participant === p.id);
+      return h('div', { class: 'agent-group' },
+        h('h3', { class: 'sub' }, p.name, p.isMe ? [' ', badge('you', 'info')] : null),
+        mine.length ? h('ul', { class: 'list' }, mine.map((a) => h('li', { class: a.active ? '' : 'resolved' },
+          h('div', { class: 'row' },
+            h('strong', null, a.agent === 'lead' ? `${a.displayName} (main session)` : a.displayName),
+            badge(a.active ? 'active' : 'finished', a.active ? 'ok' : 'muted'),
+            a.agentType && a.agent !== 'lead' ? h('span', { class: 'muted' }, a.agentType) : null),
+          h('p', { class: 'meta-line' }, 'Working on: ', a.claims.length ? a.claims.map((c) => mono(c)) : h('span', { class: 'muted' }, 'nothing claimed')))))
+          : empty('No agents seen yet.'));
+    }) : empty('No agents yet. Subagents appear here when Claude spawns them.'));
+}
+
+function queueStatus(t) {
+  if (t.status === 'unclaimed' || t.status === 'not_started') return t.ready ? 'ready' : 'waiting';
+  return t.status;
+}
+
+function secQueue() {
+  const tasks = data.state.tasks.filter((t) => t.createdBy)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0));
+  const done = tasks.filter((t) => t.status === 'done').length;
+  return section('queue', 'Task queue', tasks.length, { wide: true, note: tasks.length ? `${done} of ${tasks.length} done` : null },
+    tasks.length ? h('div', { class: 'table-wrap' }, h('table', { class: 'queue' },
+      h('thead', null, h('tr', null, ['#', 'Task', 'Status', 'Agents', 'Depends on', 'For'].map((c) => h('th', { scope: 'col' }, c)))),
+      h('tbody', null, tasks.map((t, i) => {
+        const st = queueStatus(t);
+        return h('tr', null,
+          td('#', String(i + 1)),
+          td('Task', h('strong', null, t.title), ' ', mono(t.taskId)),
+          td('Status', badge(st.replace('_', ' '), STATUS_TONE[st] ?? 'info'), t.claimConflict ? [' ', badge('CLAIM CONFLICT', 'bad')] : null),
+          td('Agents', t.claims.length ? ownerNames(t).join(', ') : h('span', { class: 'muted' }, '—')),
+          td('Depends on', (t.dependsOn ?? []).length ? t.dependsOn.map((d) => mono(d)) : h('span', { class: 'muted' }, '—')),
+          td('For', nameOf(t.assignee || 'any')));
+      }))))
+      : empty('No tasks queued. Tell Claude what to build; it posts tasks with post_tasks.'));
+}
+
 function secTasks() {
   const tasks = data.state.tasks;
   return section('tasks', 'Tasks', tasks.length, { wide: true },
@@ -205,12 +261,12 @@ function secTasks() {
           h('strong', null, t.title), mono(t.taskId),
           badge(t.status.replace('_', ' '), STATUS_TONE[t.status] ?? 'info'),
           t.claimConflict ? badge('CLAIM CONFLICT', 'bad') : null),
-        h('p', { class: 'meta-line' }, 'Owners: ', t.owners.length ? t.owners.map(nameOf).join(', ') : h('span', { class: 'muted' }, 'unclaimed')),
+        h('p', { class: 'meta-line' }, 'Owners: ', t.claims.length ? ownerNames(t).join(', ') : h('span', { class: 'muted' }, 'unclaimed')),
         t.claimConflict ? h('ul', { class: 'heads-list' }, t.claims.map((c) => h('li', null, h('strong', null, c.ownerName), ' claimed: ', c.scope, ' ', h('span', { class: 'muted' }, '· ', ago(c.ts))))) : null,
         latest ? h('p', { class: 'progress' }, h('span', { class: 'muted' }, 'Latest: '), latest.summary, ' ', h('span', { class: 'muted' }, '— ', byLine(latest))) : null,
         latest?.evidence.length ? h('p', { class: 'meta-line' }, 'Evidence: ', latest.evidence.join('; ')) : null,
         t.openBlockers.length ? h('ul', { class: 'blockers' }, t.openBlockers.map((b) => h('li', null, b))) : null);
-    })) : empty('No tasks yet. Agents create them with claim_task.'));
+    })) : empty('No tasks yet. Agents create them with post_tasks or claim_task.'));
 }
 
 function decisionCard(d, isHead) {
@@ -238,7 +294,7 @@ function secDecisions() {
 
 function message(m) {
   return h('div', { class: 'msg' },
-    h('p', { class: 'meta-line' }, h('strong', null, m.authorName), ' → ', nameOf(m.to), ' · ', ago(m.ts),
+    h('p', { class: 'meta-line' }, h('strong', null, whoOf(m)), ' → ', nameOf(m.to), ' · ', ago(m.ts),
       m.refs?.topic ? [' · ', mono(m.refs.topic)] : null, m.refs?.task ? [' · ', mono(m.refs.task)] : null,
       m.origin !== 'agent' ? [' ', badge(ORIGIN_LABEL[m.origin] ?? m.origin, 'muted')] : null),
     h('p', null, m.body));
@@ -300,7 +356,7 @@ function secActivity() {
   return section('activity', 'Activity', items.length, { wide: true, note: 'most recent 100 events, all authors' },
     items.length ? h('ol', { class: 'feed' }, items.map((e) => h('li', null,
       h('span', { class: 'feed-time' }, ago(e.ts)),
-      h('span', { class: 'feed-who' }, e.authorName),
+      h('span', { class: 'feed-who' }, whoOf(e)),
       badge(ORIGIN_LABEL[e.origin] ?? e.origin, e.origin === 'hook' ? 'info' : e.origin === 'fallback' ? 'warn' : 'muted'),
       h('span', { class: 'feed-type' }, e.type),
       h('span', { class: 'feed-sum' }, e.summary))))
@@ -363,7 +419,7 @@ function render() {
   $main.classList.toggle('stale', Boolean(failure));
   $main.setAttribute('aria-busy', 'false');
   $main.replaceChildren(
-    secConnection(), secConflicts(), secGoal(), secTasks(), secDecisions(),
+    secConnection(), secConflicts(), secAgents(), secQueue(), secGoal(), secTasks(), secDecisions(),
     secMessages(), secIssues(), secOutbound(), secActivity(), secSessions());
 }
 

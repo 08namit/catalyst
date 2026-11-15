@@ -3,9 +3,20 @@
  * Order is (lc, author, seq) — never ts — so every replica holding the same events computes the same state.
  * Heads model: an event is a head of its family if no other event of that family lists it in `supersedes`.
  */
-import { MATERIAL_TYPES, PROTOCOL_VERSION, compareEvents, isKnownType, type CatalystEvent, type PayloadOf } from '../core/protocol.js';
+import {
+  LEAD_AGENT,
+  MATERIAL_TYPES,
+  PROTOCOL_VERSION,
+  agentOf,
+  compareEvents,
+  isKnownType,
+  ownerKey,
+  type CatalystEvent,
+  type PayloadOf,
+} from '../core/protocol.js';
 import type {
   ActivityView,
+  AgentView,
   ClaimView,
   ConflictView,
   DecisionView,
@@ -50,7 +61,32 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
     participants.push({ id: e.author, name: p.name, publicKey: p.publicKey, role: p.role, joinedAt: e.ts, isMe: e.author === me });
   }
   const nameOf = (id: string) => names.get(id) ?? id;
-  const ref = (e: CatalystEvent): SourceRef => ({ id: e.id, author: e.author, authorName: nameOf(e.author), seq: e.seq, ts: e.ts, origin: e.origin });
+
+  // Agents: latest agent.registered per (author, agent) wins; any agent that authored an event is known too.
+  // The lead is always named "lead" and displayed as the participant itself.
+  const registrations = new Map<string, { participant: string; agent: string; p?: PayloadOf<'agent.registered'> }>();
+  for (const id of names.keys()) registrations.set(ownerKey(id, LEAD_AGENT), { participant: id, agent: LEAD_AGENT });
+  for (const e of known) {
+    const agent = agentOf(e);
+    const key = ownerKey(e.author, agent);
+    const entry = registrations.get(key) ?? { participant: e.author, agent };
+    if (e.type === 'agent.registered' && agent !== LEAD_AGENT) entry.p = e.payload as PayloadOf<'agent.registered'>;
+    registrations.set(key, entry);
+  }
+  const agentShortName = (participant: string, agent: string) =>
+    agent === LEAD_AGENT ? LEAD_AGENT : (registrations.get(ownerKey(participant, agent))?.p?.name ?? agent.slice(0, 8));
+  const agentName = (participant: string, agent: string) =>
+    agent === LEAD_AGENT ? nameOf(participant) : `${nameOf(participant)} / ${agentShortName(participant, agent)}`;
+  const ref = (e: CatalystEvent): SourceRef => ({
+    id: e.id,
+    author: e.author,
+    authorName: nameOf(e.author),
+    seq: e.seq,
+    ts: e.ts,
+    origin: e.origin,
+    agent: agentOf(e),
+    agentName: agentName(e.author, agentOf(e)),
+  });
   const position = new Map(known.map((e, i) => [e.id, i]));
 
   let projectInfo: ProjectState['project'] = null;
@@ -65,13 +101,21 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
     paths: string[];
     createdBy?: SourceRef;
     claimFamily: CatalystEvent[];
-    progressByAuthor: Map<string, ProgressView>;
+    /** Latest progress per ownerKey (author/agent). */
+    progressByAgent: Map<string, ProgressView>;
+    /** Runtime-only task recovery checkpoints, kept separate so they cannot reopen completed work. */
+    checkpointsByAgent: Map<string, ProgressView>;
+    dependsOn: string[];
+    assignee: string;
+    explicitOrder?: number;
+    /** Index of the first task.created among tasks (deterministic order). */
+    createdIndex?: number;
   }
   const tasks = new Map<string, TaskBuilder>();
   const task = (taskId: string): TaskBuilder => {
     let t = tasks.get(taskId);
     if (!t) {
-      t = { taskId, paths: [], claimFamily: [], progressByAuthor: new Map() };
+      t = { taskId, paths: [], claimFamily: [], progressByAgent: new Map(), checkpointsByAgent: new Map(), dependsOn: [], assignee: 'any' };
       tasks.set(taskId, t);
     }
     return t;
@@ -92,6 +136,8 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
   const activity: ActivityView[] = [];
   const generalProgress = new Map<string, ProgressView>();
   const acknowledgements: Record<string, string[]> = {};
+  const agentAcknowledgements: Record<string, string[]> = {};
+  let createdCount = 0;
   let lastMaterial: SourceRef | null = null;
 
   for (const e of known) {
@@ -114,7 +160,11 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
         t.title = p.title;
         t.description = p.description;
         t.paths = p.paths ?? [];
+        t.dependsOn = p.dependsOn ?? [];
+        t.assignee = p.assignee ?? 'any';
+        t.explicitOrder = p.order;
         t.createdBy ??= ref(e);
+        t.createdIndex ??= createdCount++;
         break;
       }
       case 'task.claimed': {
@@ -124,7 +174,9 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
           ...ref(e),
           taskId: p.taskId,
           owner: e.author,
-          ownerName: nameOf(e.author),
+          ownerName: agentName(e.author, agentOf(e)),
+          ownerAgent: agentOf(e),
+          ownerKey: ownerKey(e.author, agentOf(e)),
           scope: p.scope,
           paths: p.paths ?? [],
           note: p.note,
@@ -168,8 +220,27 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
           branch: p.branch,
           commit: p.commit,
         };
-        if (p.taskId) task(p.taskId).progressByAuthor.set(e.author, view);
-        else generalProgress.set(e.author, view);
+        const key = ownerKey(e.author, agentOf(e));
+        if (p.taskId) task(p.taskId).progressByAgent.set(key, view);
+        else generalProgress.set(key, view);
+        break;
+      }
+      case 'task.checkpoint': {
+        const p = e.payload as PayloadOf<'task.checkpoint'>;
+        const key = ownerKey(e.author, agentOf(e));
+        const view: ProgressView = {
+          ...ref(e),
+          taskId: p.taskId,
+          status: p.status,
+          summary: p.summary,
+          blockers: p.blockers ?? [],
+          evidence: p.evidence ?? [],
+          nextSteps: p.nextSteps ?? [],
+          branch: p.branch,
+          commit: p.commit,
+          runtimeOnly: true,
+        };
+        task(p.taskId).checkpointsByAgent.set(key, view);
         break;
       }
       case 'issue.reported': {
@@ -233,11 +304,14 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
           t.claimFamily.push(e);
           if (p.owner) {
             const chosen = p.chosen ? claimViews.get(p.chosen) : undefined;
+            const ownerAgent = p.ownerAgent ?? LEAD_AGENT;
             claimViews.set(e.id, {
               ...ref(e),
               taskId: p.key,
               owner: p.owner,
-              ownerName: nameOf(p.owner),
+              ownerName: agentName(p.owner, ownerAgent),
+              ownerAgent,
+              ownerKey: ownerKey(p.owner, ownerAgent),
               scope: p.resolution,
               paths: chosen?.paths ?? [],
               viaResolution: true,
@@ -251,6 +325,9 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
         for (const id of p.eventIds) {
           const list = (acknowledgements[id] ??= []);
           if (!list.includes(e.author)) list.push(e.author);
+          const byAgent = (agentAcknowledgements[id] ??= []);
+          const key = ownerKey(e.author, agentOf(e));
+          if (!byAgent.includes(key)) byAgent.push(key);
         }
         break;
       }
@@ -275,7 +352,9 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
       .map((e) => claimViews.get(e.id))
       .filter((c): c is ClaimView => c !== undefined);
     const owners = [...new Set(claims.map((c) => c.owner))];
-    const latestProgress = [...t.progressByAuthor.values()].sort((a, b) => position.get(a.id)! - position.get(b.id)!);
+    const ownerKeys = [...new Set(claims.map((c) => c.ownerKey))];
+    const progress = [...t.progressByAgent.values()];
+    const latestProgress = [...progress, ...t.checkpointsByAgent.values()].sort((a, b) => position.get(a.id)! - position.get(b.id)!);
     const blockers = [
       ...latestProgress.flatMap((p) => p.blockers),
       ...issueList.filter((i) => i.taskId === t.taskId && i.kind === 'blocker' && i.status === 'open').map((i) => i.title),
@@ -288,12 +367,53 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
       createdBy: t.createdBy,
       claims,
       owners,
+      ownerKeys,
       latestProgress,
-      status: latestProgress.at(-1)?.status ?? (claims.length > 0 ? 'claimed' : 'unclaimed'),
+      status: progress.sort((a, b) => position.get(a.id)! - position.get(b.id)!).at(-1)?.status ?? (claims.length > 0 ? 'claimed' : 'unclaimed'),
       openBlockers: [...new Set(blockers)],
-      claimConflict: owners.length > 1,
+      claimConflict: ownerKeys.length > 1,
+      dependsOn: t.dependsOn,
+      assignee: t.assignee,
+      // Tasks never posted with task.created sort after every posted one.
+      order: t.explicitOrder ?? t.createdIndex ?? createdCount++,
+      ready: false,
     };
   });
+  const statusById = new Map(taskViews.map((t) => [t.taskId, t.status]));
+  for (const t of taskViews) {
+    t.ready = t.createdBy !== undefined && t.dependsOn.every((d) => statusById.get(d) === 'done');
+  }
+
+  // Agents (deterministic: participant in join order, lead first, then name, then key)
+  const joinRank = (id: string) => {
+    const i = participants.findIndex((p) => p.id === id);
+    return i === -1 ? participants.length : i;
+  };
+  const agents: AgentView[] = [...registrations.values()]
+    .map(({ participant, agent, p }) => {
+      const address = ownerKey(participant, agent);
+      const view: AgentView = {
+        participant,
+        participantName: nameOf(participant),
+        agent,
+        address,
+        name: agentShortName(participant, agent),
+        displayName: agentName(participant, agent),
+        active: p?.active !== false,
+        isMe: participant === me,
+        claims: taskViews.filter((t) => t.ownerKeys.includes(address)).map((t) => t.taskId),
+      };
+      if (p?.agentType !== undefined) view.agentType = p.agentType;
+      return view;
+    })
+    .sort(
+      (x, y) =>
+        joinRank(x.participant) - joinRank(y.participant) ||
+        cmp(x.participant, y.participant) ||
+        Number(y.agent === LEAD_AGENT) - Number(x.agent === LEAD_AGENT) ||
+        cmp(x.name, y.name) ||
+        cmp(x.agent, y.agent),
+    );
 
   // Decisions
   const decisions: TopicView[] = [...topics.entries()].map(([key, t]) => {
@@ -327,7 +447,7 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
       scope: 'claim',
       key: t.taskId,
       heads: t.claims.map((c) => ({ ...pickRef(c), summary: short(`${c.ownerName} claims ${t.taskId}: ${c.scope}`, 300) })),
-      hint: `Agree who owns the task, then call resolve_conflict {scope:'claim', key:'${t.taskId}', owner:'<participant id>', resolution:'…'} (or one side calls release_task).`,
+      hint: `Agree who owns the task, then call resolve_conflict {scope:'claim', key:'${t.taskId}', owner:'<name or name/agent>', resolution:'…'} (or one side calls release_task).`,
     });
   }
 
@@ -335,6 +455,7 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
     project: projectInfo,
     me,
     participants,
+    agents,
     goal,
     tasks: taskViews,
     decisions,
@@ -345,6 +466,7 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
     generalProgress: [...generalProgress.values()].sort((a, b) => position.get(a.id)! - position.get(b.id)!),
     activity: activity.reverse().slice(0, 50),
     acknowledgements,
+    agentAcknowledgements,
     forks,
     lastMaterial,
     eventCount: sorted.length,
@@ -353,5 +475,9 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
 }
 
 function pickRef(r: SourceRef): SourceRef {
-  return { id: r.id, author: r.author, authorName: r.authorName, seq: r.seq, ts: r.ts, origin: r.origin };
+  return { id: r.id, author: r.author, authorName: r.authorName, seq: r.seq, ts: r.ts, origin: r.origin, agent: r.agent, agentName: r.agentName };
+}
+
+function cmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }

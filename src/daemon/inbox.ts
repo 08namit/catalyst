@@ -12,7 +12,7 @@ import type { ProjectPaths } from '../core/paths.js';
 import { formatZodError, validatePayload } from '../core/protocol.js';
 import { runTool } from './tools.js';
 
-export const INBOX_TOOLS = ['publish_decision', 'publish_progress', 'send_message', 'claim_task', 'release_task', 'report_issue', 'resolve_issue', 'set_goal'];
+export const INBOX_TOOLS = ['publish_decision', 'publish_progress', 'checkpoint_task', 'send_message', 'claim_task', 'release_task', 'report_issue', 'resolve_issue', 'set_goal'];
 export const INBOX_SESSION = 'inbox:fallback';
 
 function moveTo(dir: string, file: string): string {

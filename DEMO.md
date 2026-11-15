@@ -1,6 +1,15 @@
 # Catalyst demo
 
-The demo uses the separate sample app in [`sample/`](sample/), "Pocket Tasks". It has a tiny HTTP API and a CLI
+This document has three parts:
+- [A. Reproducible two-node run on one machine](#a-reproducible-two-node-run-on-one-machine) (v0.1 history)
+- [B. Live run with two real Claude Code sessions (recorded 2026-11-14)](#b-live-run-with-two-real-claude-code-sessions-recorded-2026-11-14) (v0.1 history)
+- [C. Two laptops, several agents each](#c-two-laptops-several-agents-each) (v0.2, the current procedure)
+
+Parts A and B were recorded with v0.1. They used terminal commands (`catalyst init`, `pair`, `join`, `goal`,
+`peer pause`) and one agent per person. Those commands still exist, but in v0.2 you do all of it by talking to
+Claude, with several named agents per person. Use part C now.
+
+Parts A and B use the sample app in [`sample/`](sample/), "Pocket Tasks". It has a tiny HTTP API and a CLI
 client, and two roles:
 
 | Role | Task | Files |
@@ -10,14 +19,11 @@ client, and two roles:
 
 The request contract is agreed through a Catalyst decision on topic `api/create-task`.
 
-This document has three parts:
-- [A. Reproducible two-node run on one machine](#a-reproducible-two-node-run-on-one-machine)
-- [B. Live run with two real Claude Code sessions (recorded 2026-11-14)](#b-live-run-with-two-real-claude-code-sessions-recorded-2026-11-14)
-- [C. Two-laptop procedure](#c-two-laptop-procedure)
-
 ---
 
 ## A. Reproducible two-node run on one machine
+
+> v0.1 history. Still useful to check the plumbing on one machine; the script's output may differ in v0.2.
 
 ```bash
 npm install && npm run build && npm link
@@ -31,6 +37,8 @@ These runs are **simulations**: commands drive the tools directly, with no agent
 plumbing, but not that a model consumed the context. Part B covers that.
 
 ## B. Live run with two real Claude Code sessions (recorded 2026-11-14)
+
+> v0.1 history: one agent per person, set up with terminal commands. Kept as the record of that run.
 
 ### Setup
 
@@ -115,43 +123,122 @@ catalyst goal "Pocket Tasks v0.2: create tasks over the API and from the CLI" \
 - The UserPromptSubmit notice inside a live session. It is covered by e2e tests that run the real hook binary.
 - Two physical laptops. The live run used two checkouts on one machine over 127.0.0.1.
 
-To verify these, use part C.
+Part C covers these on two laptops with v0.2.
 
-## C. Two-laptop procedure
+## C. Two laptops, several agents each
 
-1. **Install on both laptops** (see [README](README.md#install-from-source)):
-   `git clone … && cd catalyst && npm install && npm run build && npm link`.
-2. **Prepare the project.** Copy `sample/` into a new git repo on laptop A, then on A:
-   ```bash
-   catalyst init --name "<A>"
-   git add -A && git commit -m "Add Catalyst"
-   ```
-   Clone that repo to laptop B over any git remote or a shared folder.
-3. **Find A's LAN IP** (e.g. `ipconfig getifaddr en0` on macOS), then on A:
-   ```bash
-   catalyst pair --host <A-ip>
-   ```
-   If macOS asks whether `node` may accept incoming connections, allow it.
-4. **Join from B:**
-   ```bash
-   catalyst join cat1_… --name "<B>"
-   ```
-   Check that the confirmation code matches `catalyst status` on A.
-5. **Start Claude Code on each laptop** with `claude` in the project. Approve the `catalyst` MCP server, and
-   accept the trust dialog on first use.
-6. **Prompt the agents** with the instructions from part B. On A: "claim api-create-task, publish the POST /tasks
-   contract as a decision on api/create-task before coding, implement, test, commit on a branch, publish
-   progress". On B: "claim client-add-command, retrieve the api/create-task decision via Catalyst, ask Dev A one
-   question, implement, test, commit, acknowledge, publish progress".
-7. **Run the outage.** Turn off Wi-Fi on B, or run `catalyst peer pause`. The model provider must stay
-   reachable: with Wi-Fi off, use another uplink such as a phone hotspot, or simply use `peer pause`. Have both
-   agents publish progress and conflicting proposals.
-8. **Reconnect.** Re-enable Wi-Fi or run `catalyst peer resume`. Check the replay with `catalyst status`,
-   `catalyst dashboard` and `get_updates`, and check the conflict with `get_briefing`.
-9. **Integrate through Git.** Merge both branches, then run `npm test`, `npm start` and `node client/index.js add "…"`.
+Two people build a small notes app together. Each person runs **one** Claude Code session, and that session
+spawns subagents. All agents on both laptops take work from **one shared task queue**.
+
+The only terminal command is the install. Everything else is a sentence you say to Claude.
+
+**Targets to record:**
+- terminal commands typed (target: the install line only, plus normal git);
+- manual nudges after the first build prompt (target: 0);
+- time from a question to its answer (target: seconds, not minutes).
+
+### The app
+
+A notes CLI in Node.js, split into three tasks:
+
+| Task | Files | Depends on |
+|---|---|---|
+| `notes-core` | `src/notes.js`: `addNote`, `listNotes`, `deleteNote`, data in `data/notes.json` | — |
+| `notes-cli` | `src/cli.js`: `notes add <title> [body]`, `notes list`, `notes delete <id>` | `notes-core` |
+| `notes-tests` | `test/`: `node --test` tests for the core and the CLI | `notes-core`, `notes-cli` |
+
+### 1. Install (both laptops)
+
+```bash
+npm install -g github:08namit/catalyst && catalyst install
+```
+
+Check that the last line starts with `Done. Open Claude Code in your project and say …`.
+
+### 2. Create the project (person A, then person B)
+
+- **A:** in an empty folder, open Claude Code (`claude`) and say: *"Create a minimal Node.js project called
+  notes (ESM, tests with `node --test`, no dependencies). Commit it and push it to <your git remote>."*
+- **B:** clone that repo and open Claude Code in it.
+
+### 3. Connect (both)
+
+- **A** says: *"Set up Catalyst and invite my teammate."* Claude returns an invite line starting with `cat1_`.
+  Send it to B privately.
+- **B** says: *"Join Catalyst with cat1_…"*.
+- Both Claudes show a confirmation code. **Check that the two codes match.**
+- Both: quit Claude Code and start it again in the project, so the hooks load.
+- Both: say *"Commit the files Catalyst added."* (They are identical on both sides, so merging is clean.)
+
+**Expected:** running `catalyst` in the project on either laptop prints `Connected to <teammate> (confirmation
+code …)`.
+
+### 4. Plan the work (person A)
+
+Say:
+
+> Set the Catalyst goal: a notes CLI with add, list and delete. Post three tasks to the Catalyst queue:
+> notes-core (src/notes.js: addNote, listNotes, deleteNote; data in data/notes.json), notes-cli (src/cli.js:
+> `notes add <title> [body]`, `notes list`, `notes delete <id>`; depends on notes-core) and notes-tests (test/:
+> node --test tests for core and CLI; depends on notes-core and notes-cli). Before anyone writes code, publish
+> the note data model and the CLI output format as Catalyst decisions.
+
+**Expected:**
+- Claude calls `set_goal`, `post_tasks` and `publish_decision` twice.
+- `catalyst` on **both** laptops shows `Task queue: 0 of 3 done · 0 in progress · 1 ready · 2 blocked.`
+- The dashboard (`catalyst dashboard`) shows the queue in order, with `notes-cli` and `notes-tests` waiting
+  on their dependencies.
+
+### 5. Build with subagents (both, at the same time)
+
+Each person says:
+
+> Use 2 subagents to work through the Catalyst task queue. Each subagent: give yourself a short role name,
+> take the next task, follow the published decisions, write tests, commit on a branch named after the task,
+> complete the task with evidence, then take the next one. If nothing is ready, or you are waiting for an
+> answer, call wait_for_updates instead of stopping. Stop when the queue is empty.
+
+Then don't type anything else until the queue is empty.
+
+**Expected:**
+- Each subagent appears by name, for example `Tiam / core` and `Namit / cli`, in `catalyst status` and on the
+  dashboard's Agents panel.
+- Exactly one agent, on either laptop, takes `notes-core`. The other agents wait (`wait_for_updates`) instead
+  of grabbing a task that isn't ready.
+- When `notes-core` is done, `notes-cli` becomes ready and is taken within seconds, possibly on the other
+  laptop. `notes-tests` follows.
+- No task is worked on by two agents. If both laptops take the same task at the same moment, both sides show
+  a claim conflict and one agent releases it and takes the next task.
+
+### 6. A question across laptops
+
+While step 5 runs, have one agent ask another directly. For example, B says to their lead session:
+*"Ask Tiam/core whether deleteNote should throw or return false for an unknown id."* (Or let an agent ask on
+its own when it is unsure.)
+
+**Expected:** the question reaches only that agent. It answers with `send_message {kind: reply}` and the asking
+agent receives the reply through `wait_for_updates` within seconds. Record the time between question and
+reply.
+
+### 7. Outage and conflict (optional)
+
+- **A** says: *"Pause Catalyst sync."*
+- Each person then says: *"Revise the CLI output format decision: <a different format on each side>."*
+- **A** says: *"Resume Catalyst sync."*
+
+**Expected:** while paused, `catalyst` shows the teammate as paused with updates waiting to be sent. After
+resuming, both laptops show `Open conflicts: 1`. Either person says *"Show the Catalyst conflicts and help me
+resolve them"*, agrees on one version, and the conflict clears on both laptops.
+
+### 8. Integrate
+
+A says: *"Merge all the task branches into main, run the tests, and push."* B says: *"Pull main and run the
+tests."* Then try the app: *"Run `node src/cli.js add "First note" "hello"` and then `list`."*
 
 **Expected evidence:**
 - matching confirmation codes;
-- `status` showing `unreachable`/`paused` with pending counts during the outage, then `connected · 0 pending`;
-- the conflict listed on both laptops;
-- byte-identical IMPORTANT.md generated blocks after `catalyst handover` on both laptops.
+- named agents from both laptops on the dashboard, with each task done by exactly one agent;
+- `Task queue: 3 of 3 done` on both laptops;
+- tests passing on main on both laptops;
+- byte-identical generated blocks in `IMPORTANT.md` on both laptops;
+- the counts from the targets above (terminal commands, nudges, question-to-answer time).

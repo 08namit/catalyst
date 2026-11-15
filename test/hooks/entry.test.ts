@@ -188,15 +188,18 @@ describe('session-end', () => {
     const dir = makeProject();
     daemon = await startFakeDaemon(dir, {
       'POST /api/events': () => ({ body: { ok: true } }),
+      'POST /api/agents/stop': () => ({ body: { agent: 'lead', released: [] } }),
       'POST /api/handover': () => ({ body: { path: 'IMPORTANT.md', changed: true, generatedAt: 'now' } }),
     });
     for (const f of ['src/a.ts', 'src/b.ts', 'src/a.ts']) {
       await runHook('post-tool-use', { dir, input: { session_id: SID, tool_name: 'Edit', tool_input: { file_path: f }, cwd: dir } });
     }
+    writeFileSync(join(dir, '.catalyst', 'sessions', `${SID}--a1.touched`), 'src/agent.ts\n');
     await runHook('session-end', { dir, input: { session_id: SID, reason: 'exit' } });
     const ev = daemon.requests.find((r) => r.path === '/api/events')?.body as Record<string, unknown>;
     expect(ev).toMatchObject({ type: 'activity.captured', origin: 'hook', payload: { kind: 'files', summary: 'Session touched 2 files', paths: ['src/a.ts', 'src/b.ts'] } });
     expect(String(ev.clientId)).toMatch(new RegExp(`^files:${SID}:2:[0-9a-f]{16}$`));
+    expect(daemon.requests.filter((r) => r.path === '/api/agents/stop').map((r) => r.body)).toEqual([{ agentId: 'a1' }, { agentId: 'lead' }]);
     expect(daemon.requests.some((r) => r.path === '/api/handover')).toBe(true);
     expect(existsSync(join(dir, '.catalyst', 'sessions', `${SID}.touched`))).toBe(false);
     expect(out.join('')).toBe('');

@@ -149,6 +149,11 @@ details[open] > summary { margin-bottom: 8px; }
 .people { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .people li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 
+/* Agents & queue ---------------------------------------------------------- */
+.agent-group + .agent-group { margin-top: 10px; }
+.queue td:first-child { color: var(--muted); font-variant-numeric: tabular-nums; width: 2em; }
+.queue td code + code { margin-left: 4px; }
+
 /* Tasks ------------------------------------------------------------------- */
 .tasks { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; }
 .task { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; background: var(--panel-2); }
@@ -187,7 +192,7 @@ tbody tr:last-child td { border-bottom: 0; }
 /* Activity feed ----------------------------------------------------------- */
 .feed { display: flex; flex-direction: column; max-height: 420px; overflow-y: auto; }
 .feed li {
-  display: grid; grid-template-columns: 76px 64px 190px 150px 1fr; align-items: baseline; gap: 8px;
+  display: grid; grid-template-columns: 76px 120px 190px 150px 1fr; align-items: baseline; gap: 8px;
   padding: 5px 0; border-top: 1px solid var(--line); font-size: 13px;
 }
 .feed li:first-child { border-top: 0; }

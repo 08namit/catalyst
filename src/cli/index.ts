@@ -3,15 +3,14 @@
  * `catalyst` CLI. Heavy modules (zod, MCP SDK, node:sqlite, sync) are loaded lazily inside each action so that
  * `catalyst hook <event>` starts fast. Errors: one actionable line on stderr, exit 1 (hooks always exit 0).
  */
-import { execFileSync, spawn } from 'node:child_process';
-import { accessSync, chmodSync, constants, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { createServer, connect } from 'node:net';
-import { networkInterfaces, userInfo } from 'node:os';
-import { basename, delimiter, join, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { connect } from 'node:net';
+import { join, resolve } from 'node:path';
 import type { Command } from 'commander';
 import type { Briefing, DashboardState, InviteResponse, PublishResult, StatusResponse, SyncSummary, FileWriteResponse, UpdatesResult } from '../core/api.js';
-import { ensureDir, loadConfig, loadIdentity, readDaemonInfo, readJson, saveConfig, saveIdentity, type Identity, type ProjectConfig } from '../core/config.js';
-import { findProjectDir, projectPaths, type ProjectPaths } from '../core/paths.js';
+import { loadConfig, readDaemonInfo, readJson } from '../core/config.js';
+import { findProjectDir, projectPaths } from '../core/paths.js';
 import type { CatalystClient } from '../client/index.js';
 
 class CliError extends Error {}
@@ -55,7 +54,7 @@ function globals(cmd: Command): GlobalOpts {
 function projectDir(cmd: Command): string {
   const { dir } = globals(cmd);
   const found = findProjectDir(dir);
-  if (!found) throw new CliError(`No Catalyst project at ${dir ? resolve(dir) : process.cwd()} (or any parent). Run \`catalyst init\` or \`catalyst join <invite>\` first.`);
+  if (!found) throw new CliError(`No Catalyst project in ${dir ? resolve(dir) : process.cwd()} (or any parent). Open Claude Code there and say "set up Catalyst" (or run \`catalyst init\` / \`catalyst join <invite>\`).`);
   return found;
 }
 
@@ -73,46 +72,6 @@ function intOpt(v: string | undefined, name: string): number | undefined {
   return n;
 }
 
-function defaultName(): string {
-  try {
-    const n = execFileSync('git', ['config', 'user.name'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 2000 }).trim();
-    if (n) return n.slice(0, 80);
-  } catch {
-    /* no git or no user.name */
-  }
-  return userInfo().username;
-}
-
-/** Persisted advertiseHosts: a loopback-bound peer listener is only reachable on 127.0.0.1; otherwise [] = auto-detect. */
-function loopbackHosts(bind: string): string[] {
-  return bind === '127.0.0.1' || bind === 'localhost' ? ['127.0.0.1'] : [];
-}
-
-function detectHosts(bind: string): string[] {
-  if (loopbackHosts(bind).length) return loopbackHosts(bind);
-  const hosts: string[] = [];
-  for (const list of Object.values(networkInterfaces())) {
-    for (const a of list ?? []) if (a.family === 'IPv4' && !a.internal) hosts.push(a.address);
-  }
-  return hosts.length ? hosts : ['127.0.0.1'];
-}
-
-function formatAddr(host: string, port: number): string {
-  return host.includes(':') ? `[${host}]:${port}` : `${host}:${port}`;
-}
-
-function freePort(bind: string): Promise<number> {
-  return new Promise((res, rej) => {
-    const srv = createServer();
-    srv.once('error', rej);
-    srv.listen(0, bind, () => {
-      const addr = srv.address();
-      const port = typeof addr === 'object' && addr ? addr.port : 0;
-      srv.close(() => res(port));
-    });
-  });
-}
-
 function ago(iso: string | undefined): string {
   if (!iso) return 'never';
   const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
@@ -122,24 +81,9 @@ function ago(iso: string | undefined): string {
   return `${Math.round(s / 86400)}d ago`;
 }
 
-function newIdentity(name: string, keys: { publicKey: string; privateKey: string }, participantId: string): Identity {
-  return { participantId, name, publicKey: keys.publicKey, privateKey: keys.privateKey };
-}
-
-/** gitignore, Claude setup and daemon start shared by init and join. */
-async function finishSetup(paths: ProjectPaths, opts: { setup?: boolean; start?: boolean }): Promise<void> {
-  const { ensureGitignore, setupClaude } = await import('../setup/claude.js');
-  if (ensureGitignore(paths.projectDir)) out('Added .catalyst/ to .gitignore.');
-  if (opts.setup !== false) {
-    const { changes } = setupClaude(paths.projectDir);
-    for (const c of changes) out(`Claude setup: ${c}`);
-    if (!changes.length) out('Claude setup: already up to date.');
-  }
-  if (opts.start !== false) {
-    const { startDaemon } = await import('../client/index.js');
-    const { info } = await startDaemon(paths);
-    out(`Daemon running (pid ${info.pid}, peer port ${info.peerPort}).`);
-  }
+/** File names touched by Claude setup ("CLAUDE.md: …" → "CLAUDE.md"). */
+function changedFiles(changes: string[]): string[] {
+  return [...new Set(changes.map((c) => c.split(':')[0]!.trim()).filter((f) => f && !f.startsWith('Catalyst data')))];
 }
 
 function printPublish(r: { text?: string }): void {
@@ -159,131 +103,130 @@ async function main(): Promise<void> {
     /* unknown */
   }
   program
-    .description('Connect two developers\' Claude Code sessions: shared goals, tasks, decisions, progress and questions.')
+    .description('Connect two developers\' Claude Code sessions (and their subagents): shared goals, a task queue, decisions, progress and questions.')
     .version(version)
     .option('--dir <projectDir>', 'project directory (default: nearest parent with .catalyst/)')
-    .showHelpAfterError();
+    .showHelpAfterError()
+    .addHelpText(
+      'after',
+      [
+        '',
+        'Most things happen by talking to Claude. After `catalyst install`, open Claude Code in your project and say',
+        '"set up Catalyst and invite my teammate" (or "join Catalyst with <invite>").',
+        'Run `catalyst` with no command for a short status. More commands: start, stop, goal, briefing, updates,',
+        'handover, snapshot, tool, setup (see README.md).',
+      ].join('\n'),
+    )
+    .action(
+      act(async (_opts: unknown, cmd: Command) => {
+        if (cmd.args.length) throw new CliError(`Unknown command "${cmd.args[0]}". Run \`catalyst --help\`.`);
+        await homeCommand(cmd);
+      }),
+    );
+
+  program
+    .command('install')
+    .description('one-time setup for you: register Catalyst with Claude Code (all projects)')
+    .action(
+      act(async () => {
+        const { install, realDeps } = await import('./install.js');
+        const r = install(realDeps());
+        for (const l of r.lines) out(l);
+        if (!r.ok) process.exitCode = 1;
+      }),
+    );
+
+  program
+    .command('uninstall [target]')
+    .description('undo `catalyst install`; `uninstall claude` instead removes Catalyst\'s files from this project')
+    .action(
+      act(async (target: string | undefined, _opts: unknown, cmd: Command) => {
+        if (target === undefined) {
+          const { uninstall, realDeps } = await import('./install.js');
+          const r = uninstall(realDeps());
+          for (const l of r.lines) out(l);
+          if (!r.ok) process.exitCode = 1;
+          return;
+        }
+        if (target !== 'claude') throw new CliError(`Unknown uninstall target "${target}". Use \`catalyst uninstall\` or \`catalyst uninstall claude\`.`);
+        const { uninstallClaude } = await import('../setup/claude.js');
+        const { changes } = uninstallClaude(projectDir(cmd));
+        for (const c of changes) out(c);
+        out('To delete all Catalyst data for this project: catalyst stop && rm -rf .catalyst');
+      }),
+    );
 
   program
     .command('init')
-    .description('initialise Catalyst in this project (first developer)')
-    .option('--name <name>', 'your display name (default: git user.name)')
-    .option('--project-name <name>', 'project name (default: directory name)')
-    .option('--peer-port <n>', 'peer listener port (default: free port chosen on first start)')
-    .option('--peer-bind <addr>', 'peer listener bind address', '0.0.0.0')
-    .option('--api-port <n>', 'loopback API port (default: random)')
-    .option('--host <host...>', 'host/IP to advertise in invitations (default: auto-detect)')
+    .description('set up Catalyst in this project (first developer; Claude can do this for you)')
+    .option('--name <name>', 'your name as your teammate sees it (default: git user.name)')
+    .option('--project-name <name>', 'project name (default: folder name)')
+    .option('--peer-port <n>', 'advanced: peer listener port (default: a free port)')
+    .option('--peer-bind <addr>', 'advanced: peer listener bind address (default 0.0.0.0; 127.0.0.1 for one-machine tests)')
+    .option('--api-port <n>', 'advanced: loopback API port (default: random)')
+    .option('--host <host...>', 'advanced: host/IP to put in invitations (default: auto-detect)')
     .option('--no-setup', 'skip Claude Code setup (.mcp.json, hooks, CLAUDE.md)')
-    .option('--no-start', 'do not start the daemon')
+    .option('--no-start', 'do not start Catalyst')
     .action(
-      act(async (opts: { name?: string; projectName?: string; peerPort?: string; peerBind: string; apiPort?: string; host?: string[]; setup: boolean; start: boolean }, cmd: Command) => {
-        const dir = resolve(globals(cmd).dir ?? process.cwd());
-        const paths = projectPaths(dir);
-        if (existsSync(paths.config)) throw new CliError(`Already initialised (${paths.config} exists). Use \`catalyst status\`.`);
-        const { generateKeyPair, participantIdFromPublicKey, newProjectId } = await import('../core/protocol.js');
-        const peerPort = intOpt(opts.peerPort, 'peer-port') ?? 0;
-        const apiPort = intOpt(opts.apiPort, 'api-port') ?? 0;
-        ensureDir(paths.dataDir, 0o700);
-        chmodSync(paths.dataDir, 0o700);
-        const name = opts.name ?? defaultName();
-        const keys = generateKeyPair();
-        const participantId = participantIdFromPublicKey(keys.publicKey);
-        saveIdentity(paths, newIdentity(name, keys, participantId));
-        const config: ProjectConfig = {
-          projectId: newProjectId(),
-          projectName: opts.projectName ?? basename(dir),
-          participantId,
-          name,
-          peerPort,
-          peerBind: opts.peerBind,
-          apiPort,
-          advertiseHosts: opts.host ?? loopbackHosts(opts.peerBind),
-          createdByMe: true,
-          autoHandover: true,
-          createdAt: new Date().toISOString(),
-        };
-        saveConfig(paths, config);
-        out(`Initialised Catalyst project "${config.projectName}" (${config.projectId}) as ${name} (${participantId}).`);
-        await finishSetup(paths, opts);
-        out('');
-        out('Next steps:');
-        if (opts.start === false) out('  catalyst start              # start the local daemon');
-        out('  catalyst pair               # create a single-use invitation for your teammate');
-        out('  catalyst status             # check peer connection and confirmation code');
-        out('  (restart Claude Code in this project so it loads the Catalyst MCP server and hooks)');
+      act(async (opts: { name?: string; projectName?: string; peerPort?: string; peerBind?: string; apiPort?: string; host?: string[]; setup: boolean; start: boolean }, cmd: Command) => {
+        const { initProject } = await import('../setup/project.js');
+        const peerPort = intOpt(opts.peerPort, 'peer-port');
+        const apiPort = intOpt(opts.apiPort, 'api-port');
+        const r = await initProject({
+          dir: resolve(globals(cmd).dir ?? process.cwd()),
+          ...(opts.name ? { name: opts.name } : {}),
+          ...(opts.projectName ? { projectName: opts.projectName } : {}),
+          ...(peerPort !== undefined ? { peerPort } : {}),
+          ...(opts.peerBind ? { peerBind: opts.peerBind } : {}),
+          ...(apiPort !== undefined ? { apiPort } : {}),
+          ...(opts.host ? { hosts: opts.host } : {}),
+          setup: opts.setup,
+          start: opts.start,
+        });
+        out(`Catalyst is set up for "${r.projectName}". You are ${r.name}.`);
+        const files = changedFiles(r.setupChanges);
+        if (files.length) out(`Claude Code files written: ${files.join(', ')} (commit them so your teammate gets them too).`);
+        out(r.daemonPid ? 'Catalyst is running.' : 'Catalyst is not running yet: run `catalyst start`.');
+        out('Next: ask Claude to "invite my teammate to Catalyst" (or run `catalyst pair`) and send them the invite.');
+        if (opts.setup !== false) out('Restart Claude Code once in this folder so the Catalyst hooks load.');
       }),
     );
 
   program
     .command('join <invite>')
-    .description('join a teammate\'s project with a `catalyst pair` invitation (run in your checkout)')
-    .option('--name <name>', 'your display name (default: git user.name)')
-    .option('--peer-port <n>', 'peer listener port (default: a free port)')
-    .option('--peer-bind <addr>', 'peer listener bind address', '0.0.0.0')
-    .option('--host <host...>', 'host/IP to advertise to your peer (default: auto-detect)')
+    .description('join your teammate\'s project with their cat1_… invite (Claude can do this for you)')
+    .option('--name <name>', 'your name as your teammate sees it (default: git user.name)')
+    .option('--peer-port <n>', 'advanced: peer listener port (default: a free port)')
+    .option('--peer-bind <addr>', 'advanced: peer listener bind address (default 0.0.0.0; 127.0.0.1 for one-machine tests)')
+    .option('--host <host...>', 'advanced: host/IP your teammate should dial (default: auto-detect)')
     .option('--no-setup', 'skip Claude Code setup')
-    .option('--no-start', 'do not start the daemon')
+    .option('--no-start', 'do not start Catalyst')
     .action(
-      act(async (token: string, opts: { name?: string; peerPort?: string; peerBind: string; host?: string[]; setup: boolean; start: boolean }, cmd: Command) => {
-        const dir = resolve(globals(cmd).dir ?? process.cwd());
-        const paths = projectPaths(dir);
-        const { parseInvite, joinWithInvite } = await import('../sync/pairing.js');
-        const invite = parseInvite(token.trim());
-        const existing = readJson<ProjectConfig>(paths.config);
-        if (existing && existing.projectId !== invite.project) {
-          throw new CliError(`${dir} is already Catalyst project "${existing.projectName}" (${existing.projectId}); this invitation is for "${invite.projectName}". Join from a separate checkout or use --dir.`);
-        }
-        const { generateKeyPair, participantIdFromPublicKey } = await import('../core/protocol.js');
-        let identity: Identity;
-        if (existing) {
-          identity = loadIdentity(paths);
-        } else {
-          const keys = generateKeyPair();
-          identity = newIdentity(opts.name ?? defaultName(), keys, participantIdFromPublicKey(keys.publicKey));
-        }
-        const peerPort = intOpt(opts.peerPort, 'peer-port') || existing?.peerPort || (await freePort(opts.peerBind));
-        const hosts = opts.host ?? (existing?.advertiseHosts.length ? existing.advertiseHosts : detectHosts(opts.peerBind));
-        const { createLogger } = await import('../core/log.js');
-        const logger = createLogger(null, 'join', process.env.CATALYST_DEBUG === '1' ? 'debug' : 'error');
-        out(`Joining "${invite.projectName}" — invited by ${invite.inviter.name}; dialing ${invite.addrs.join(', ')} …`);
-        const joined = await joinWithInvite(token.trim(), {
-          identity: { participantId: identity.participantId, name: identity.name, publicKey: identity.publicKey },
-          addrs: hosts.map((h) => formatAddr(h, peerPort)),
-          logger,
+      act(async (token: string, opts: { name?: string; peerPort?: string; peerBind?: string; host?: string[]; setup: boolean; start: boolean }, cmd: Command) => {
+        const { joinProject } = await import('../setup/project.js');
+        const peerPort = intOpt(opts.peerPort, 'peer-port');
+        out('Connecting to your teammate…');
+        const r = await joinProject({
+          dir: resolve(globals(cmd).dir ?? process.cwd()),
+          invite: token.trim(),
+          ...(opts.name ? { name: opts.name } : {}),
+          ...(peerPort !== undefined ? { peerPort } : {}),
+          ...(opts.peerBind ? { peerBind: opts.peerBind } : {}),
+          ...(opts.host ? { hosts: opts.host } : {}),
+          setup: opts.setup,
+          start: opts.start,
         });
-        ensureDir(paths.dataDir, 0o700);
-        chmodSync(paths.dataDir, 0o700);
-        if (!existing) {
-          saveIdentity(paths, identity);
-          saveConfig(paths, {
-            projectId: joined.projectId,
-            projectName: joined.projectName,
-            participantId: identity.participantId,
-            name: identity.name,
-            peerPort,
-            peerBind: opts.peerBind,
-            apiPort: 0,
-            advertiseHosts: opts.host ?? loopbackHosts(opts.peerBind),
-            createdByMe: false,
-            autoHandover: true,
-            createdAt: new Date().toISOString(),
-          });
-        }
-        const { loadSecrets, saveSecrets } = await import('../core/config.js');
-        const secrets = loadSecrets(paths, joined.projectId);
-        secrets.peers[joined.inviter.participantId] = joined.inviter;
-        saveSecrets(paths, secrets);
-        out(`Joined "${joined.projectName}" (${joined.projectId}) as ${identity.name} (${identity.participantId}); peer: ${joined.inviter.name}.`);
-        out(`Confirmation code: ${joined.confirmCode}`);
-        out(`Ask ${joined.inviter.name} to compare it with the code shown by \`catalyst status\` on their machine — they must match.`);
-        if (existing) out('This checkout was already part of the project: kept your identity. Restart the daemon (`catalyst stop && catalyst start`) to dial the new peer.');
-        await finishSetup(paths, opts);
+        out(`Joined "${r.projectName}", invited by ${r.inviterName}. You are ${r.name}.`);
+        out(`Confirmation code: ${r.confirmCode}. Check that ${r.inviterName} sees the same code (their Claude shows it, or \`catalyst status\`).`);
+        if (r.alreadyJoined) out('This folder was already part of the project, so your identity was kept.');
+        out(r.daemonPid ? 'Catalyst is running.' : 'Catalyst is not running yet: run `catalyst start`.');
+        if (opts.setup !== false) out('Restart Claude Code once in this folder so the Catalyst hooks load.');
       }),
     );
 
   program
-    .command('start')
-    .description('start the daemon in the background')
+    .command('start', { hidden: true })
+    .description('start the daemon in the background (Claude Code starts it for you)')
     .action(
       act(async (_opts: unknown, cmd: Command) => {
         const { startDaemon, probeDaemon } = await import('../client/index.js');
@@ -295,8 +238,8 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('stop')
-    .description('stop the daemon')
+    .command('stop', { hidden: true })
+    .description('stop Catalyst in this project (Claude Code restarts it when needed)')
     .action(
       act(async (_opts: unknown, cmd: Command) => {
         const { probeDaemon, CatalystClient } = await import('../client/index.js');
@@ -324,19 +267,19 @@ async function main(): Promise<void> {
 
   program
     .command('status')
-    .description('show project, daemon, peers, sessions, conflicts and files')
+    .description('show connection, agents, task queue, conflicts and details')
     .option('--json', 'print raw JSON')
     .action(act(async (opts: { json?: boolean }, cmd: Command) => statusCommand(cmd, Boolean(opts.json))));
 
   program
     .command('doctor')
-    .description('check installation, files, daemon and Claude setup')
+    .description('check the installation and this project\'s setup, with fixes')
     .action(act(async (_opts: unknown, cmd: Command) => doctorCommand(cmd)));
 
   program
     .command('pair')
-    .description('create a single-use invitation for your teammate')
-    .option('--ttl <minutes>', 'invitation lifetime in minutes', '15')
+    .description('create a single-use invite for your teammate (or ask Claude to "invite my teammate")')
+    .option('--ttl <minutes>', 'invite lifetime in minutes', '30')
     .option('--host <host...>', 'host/IP to advertise (default: auto-detect)')
     .action(
       act(async (opts: { ttl: string; host?: string[] }, cmd: Command) => {
@@ -344,19 +287,16 @@ async function main(): Promise<void> {
         if (!Number.isInteger(ttlMinutes) || ttlMinutes < 1 || ttlMinutes > 1440) throw new CliError('--ttl must be 1-1440 minutes.');
         const c = await daemonClient(cmd);
         const inv = await c.post<InviteResponse>('/api/invites', { ttlMinutes, ...(opts.host ? { hosts: opts.host } : {}) });
-        out(`Invitation (single use, expires ${new Date(inv.expiresAt).toLocaleString()}):`);
+        out(`Send this invite to your teammate privately. It works once and expires at ${new Date(inv.expiresAt).toLocaleTimeString()}:`);
         out('');
         out(`  ${inv.token}`);
         out('');
-        out('Share it privately — it is a secret that grants access to this project.');
-        out('Your teammate runs, in their own checkout of the project:');
-        out(`  catalyst join ${inv.token.slice(0, 12)}… --name <their name>`);
-        out(`Advertised addresses: ${inv.addrs.join(', ')} (wrong network? re-run with --host <your LAN IP>; allow inbound TCP on the peer port).`);
-        out('After they join, both sides show a confirmation code (`catalyst status`); check that they match.');
+        out('In their copy of the project they tell Claude: "join Catalyst with <the invite>" (or run `catalyst join <invite>`).');
+        out(`Their laptop will dial ${inv.addrs.join(', ')}. Wrong address? Run \`catalyst pair --host <your LAN or VPN IP>\`.`);
       }),
     );
 
-  const peer = program.command('peer').description('peer sync controls');
+  const peer = program.command('peer').description('pause, resume or inspect the link to your teammate');
   peer
     .command('list')
     .description('list paired peers and their connection state')
@@ -420,7 +360,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('handover')
+    .command('handover', { hidden: true })
     .description('regenerate the generated block in IMPORTANT.md')
     .action(
       act(async (_opts: unknown, cmd: Command) => {
@@ -430,7 +370,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('snapshot')
+    .command('snapshot', { hidden: true })
     .description('regenerate .catalyst/snapshot.md/json (fallback for agents)')
     .action(
       act(async (_opts: unknown, cmd: Command) => {
@@ -440,7 +380,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('briefing')
+    .command('briefing', { hidden: true })
     .description('print the briefing an agent would get')
     .option('--task <task>')
     .option('--topic <topic>')
@@ -454,7 +394,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('updates')
+    .command('updates', { hidden: true })
     .description('list peer updates')
     .option('--since <n>', 'cursor')
     .option('--limit <n>', 'max items (1-50)')
@@ -469,7 +409,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('goal <title>')
+    .command('goal <title>', { hidden: true })
     .description('set the shared project goal')
     .option('--description <text>')
     .option('--criteria <c...>', 'success criteria')
@@ -485,7 +425,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('tool <name> <json>')
+    .command('tool <name> <json>', { hidden: true })
     .description('call a Catalyst tool as a human, e.g. catalyst tool publish_progress \'{"status":"done","summary":"…"}\'')
     .action(
       act(async (name: string, json: string, _opts: unknown, cmd: Command) => {
@@ -500,7 +440,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('setup <target>')
+    .command('setup <target>', { hidden: true })
     .description('install the Claude Code integration (target: claude)')
     .action(
       act(async (target: string, _opts: unknown, cmd: Command) => {
@@ -515,20 +455,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('uninstall <target>')
-    .description('remove the Claude Code integration (target: claude); keeps .catalyst/ data')
-    .action(
-      act(async (target: string, _opts: unknown, cmd: Command) => {
-        if (target !== 'claude') throw new CliError(`Unknown uninstall target "${target}"; use \`catalyst uninstall claude\`.`);
-        const { uninstallClaude } = await import('../setup/claude.js');
-        const { changes } = uninstallClaude(projectDir(cmd));
-        for (const c of changes) out(c);
-        out('To delete all Catalyst data for this project: catalyst stop && rm -rf .catalyst');
-      }),
-    );
-
-  program
-    .command('daemon')
+    .command('daemon', { hidden: true })
     .description('run the daemon in the foreground (used by `catalyst start`)')
     .action(
       act(async (_opts: unknown, cmd: Command) => {
@@ -547,8 +474,8 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('mcp')
-    .description('run the stdio MCP server (started by Claude Code via .mcp.json)')
+    .command('mcp', { hidden: true })
+    .description('run the stdio MCP server (started by Claude Code)')
     .action(
       act(async (_opts: unknown, cmd: Command) => {
         const { runMcpServer } = await import('../mcp/server.js');
@@ -557,7 +484,7 @@ async function main(): Promise<void> {
     );
 
   program
-    .command('hook <event>')
+    .command('hook <event>', { hidden: true })
     .description('Claude Code hook entry (always exits 0)')
     .action(async (event: string, _opts: unknown, cmd: Command) => {
       try {
@@ -570,6 +497,9 @@ async function main(): Promise<void> {
       exitAfterFlush();
     });
 
+  // Root only (set after the subcommands so they keep strict argument checks): unknown words reach the root
+  // action, which names them instead of commander's "too many arguments".
+  program.allowExcessArguments(true);
   await program.parseAsync(process.argv);
 }
 
@@ -579,7 +509,7 @@ async function main(): Promise<void> {
 function printPeers(sync: SyncSummary): void {
   out(`Sync:    ${sync.freshness}`);
   if (!sync.peers.length) {
-    out('Peers:   none paired (`catalyst pair`)');
+    out('Peers:   none paired yet (ask Claude to "invite my teammate", or run `catalyst pair`)');
     return;
   }
   out('Peers:');
@@ -589,6 +519,26 @@ function printPeers(sync: SyncSummary): void {
     out(`    addrs: ${p.addrs.join(', ') || '(none)'}${p.confirmCode ? ` · confirmation code ${p.confirmCode}` : ''}`);
     if (p.lastError && p.state !== 'connected') out(`    last error: ${p.lastError}`);
   }
+}
+
+/** `catalyst` with no arguments: a few plain-English lines, or how to get started. */
+async function homeCommand(cmd: Command): Promise<void> {
+  const summary = await import('./summary.js');
+  const found = findProjectDir(globals(cmd).dir);
+  if (!found) {
+    for (const l of summary.outsideLines()) out(l);
+    return;
+  }
+  const paths = projectPaths(found);
+  const config = loadConfig(paths);
+  const { probeDaemon, CatalystClient } = await import('../client/index.js');
+  const live = await probeDaemon(paths);
+  if (!live) {
+    for (const l of summary.homeNotRunningLines(config.projectName, config.name)) out(l);
+    return;
+  }
+  const s = await new CatalystClient(paths, { client: 'cli', session: 'cli:human' }).get<StatusResponse>('/api/status');
+  for (const l of summary.homeLines(s, config.projectName)) out(l);
 }
 
 async function statusCommand(cmd: Command, json: boolean): Promise<void> {
@@ -602,9 +552,10 @@ async function statusCommand(cmd: Command, json: boolean): Promise<void> {
       out(JSON.stringify({ running: false, config }, null, 2));
       return;
     }
+    out('Catalyst is not running in this project. Open Claude Code here (it starts Catalyst) or run `catalyst start`.');
+    out('');
     out(`Project: ${config.projectName} (${config.projectId})`);
     out(`Me:      ${config.name} (${config.participantId})`);
-    out('Daemon:  not running — start it with `catalyst start`');
     return;
   }
   const c = new CatalystClient(paths, { client: 'cli', session: 'cli:human' });
@@ -614,6 +565,9 @@ async function statusCommand(cmd: Command, json: boolean): Promise<void> {
     out(JSON.stringify({ running: true, ...s, conflicts: state?.state.conflicts ?? [] }, null, 2));
     return;
   }
+  const { statusSummaryLines, agentDetailLines, queueDetailLines } = await import('./summary.js');
+  for (const l of statusSummaryLines(s)) out(l);
+  out('');
   const h = s.health;
   out(`Project: ${config.projectName} (${h.projectId})`);
   out(`Me:      ${h.name} (${h.participantId})`);
@@ -627,8 +581,10 @@ async function statusCommand(cmd: Command, json: boolean): Promise<void> {
       out(`  - ${x.id} (${x.kind}${x.linkedSession ? `, linked ${x.linkedSession}` : ''}) · last seen ${ago(x.lastSeenAt)} · last retrieval ${ago(x.lastRetrievalAt)}`);
     }
   } else out('Sessions: none yet');
+  for (const l of agentDetailLines(s.agents)) out(l);
+  for (const l of queueDetailLines(s.queue)) out(l);
   out(`Conflicts: ${s.counts.conflicts}`);
-  for (const cf of state?.state.conflicts ?? []) out(`  - ${cf.scope} \`${cf.key}\`: ${cf.heads.map((hd) => `${hd.authorName}: ${hd.summary}`).join(' vs ')}`);
+  for (const cf of state?.state.conflicts ?? []) out(`  - ${cf.scope} \`${cf.key}\`: ${cf.heads.map((hd) => `${hd.agentName ?? hd.authorName}: ${hd.summary}`).join(' vs ')}`);
   if (s.counts.forks) out(`Forks:   ${s.counts.forks} — an identity was used from two checkouts; see \`catalyst doctor\``);
   out(`Inbox:   ${s.inbox.pending} pending · ${s.inbox.imported} imported · ${s.inbox.rejected} rejected${s.inbox.rejected ? ` (see ${paths.inboxRejected})` : ''}`);
   out(`Snapshot: ${s.snapshot.path} (${s.snapshot.generatedAt ? ago(s.snapshot.generatedAt) : 'not written yet'})`);
@@ -649,7 +605,7 @@ async function doctorCommand(cmd: Command): Promise<void> {
 
   const { dir } = globals(cmd);
   const found = findProjectDir(dir);
-  check(Boolean(found), found ? `project config: ${join(found, '.catalyst', 'config.json')}` : 'project config found', 'run `catalyst init` or `catalyst join <invite>` in the project root');
+  check(Boolean(found), found ? `project config: ${join(found, '.catalyst', 'config.json')}` : 'project config found', 'open Claude Code in the project and say "set up Catalyst" (or run `catalyst init` / `catalyst join <invite>`)');
   if (!found) {
     process.exit(1);
   }
@@ -706,15 +662,8 @@ async function doctorCommand(cmd: Command): Promise<void> {
   const settings = readJsonSafe(join(found, '.claude', 'settings.json'));
   check(JSON.stringify(settings ?? {}).includes('catalyst hook'), '.claude/settings.json has Catalyst hooks', 'run `catalyst setup claude`');
 
-  const onPath = (process.env.PATH ?? '').split(delimiter).some((d) => {
-    try {
-      accessSync(join(d, 'catalyst'), constants.X_OK);
-      return true;
-    } catch {
-      return false;
-    }
-  });
-  check(onPath, '`catalyst` is on PATH (needed by hooks and .mcp.json)', 'run `npm link` in the Catalyst checkout (or `npm i -g`), then restart your shell');
+  const { whichOnPath } = await import('./install.js');
+  check(Boolean(whichOnPath('catalyst')), '`catalyst` is on PATH (needed by hooks and .mcp.json)', 'run `npm install -g github:08namit/catalyst && catalyst install`, then open a new terminal');
 
   const rejected = existsSync(paths.inboxRejected) ? readdirSync(paths.inboxRejected).filter((f) => f.endsWith('.json')).length : 0;
   check(rejected === 0, `no rejected inbox drafts (${rejected})`, `read the .error.txt files in ${paths.inboxRejected}, fix and move drafts back to ${paths.inbox}`);

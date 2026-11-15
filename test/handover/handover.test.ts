@@ -50,6 +50,30 @@ describe('IMPORTANT.md handover', () => {
     expect(ta).toMatch(/get_briefing/);
   });
 
+  it('shows agents and queue fields, identically on both replicas', () => {
+    const { a, b } = populated();
+    const api = 'a7a6a241124692d30';
+    a.append({ type: 'agent.registered', payload: { agent: api, name: 'api', agentType: 'general-purpose' }, origin: 'system', agent: api });
+    a.append({ type: 'agent.registered', payload: { agent: 'b1c2d3e4f5a6b7c8d', name: 'gone', active: false }, origin: 'system', agent: 'b1c2d3e4f5a6b7c8d' });
+    a.append({ type: 'task.created', payload: { taskId: 'core', title: 'Core', order: 0 }, origin: 'agent' });
+    a.append({ type: 'task.created', payload: { taskId: 'ui', title: 'UI', dependsOn: ['core'], assignee: b.me, order: 1 }, origin: 'agent' });
+    a.append({ type: 'task.claimed', payload: { taskId: 'core', scope: 'core lib' }, origin: 'agent', agent: api });
+    sync(a, b);
+    sync(b, a);
+    const ta = renderHandoverBlock(a.getState());
+    expect(ta).toBe(renderHandoverBlock(b.getState()));
+    const agentLines: Record<string, string[]> = {
+      Tiam: ['- Tiam (lead) — working on `api`', '- Tiam / api (general-purpose) — working on `core`'],
+      Namit: ['- Namit (lead)'],
+    };
+    const expected = ['### Agents', ...a.getState().participants.flatMap((p) => agentLines[p.name]!), '- 1 finished agent(s) not shown.'].join('\n');
+    expect(ta).toContain(expected);
+    expect(ta).toMatch(/\| Task \| Owner\(s\) \| Status \| Depends on \| Latest \| By \|/);
+    expect(ta).toMatch(/\| `core` Core \| Tiam \/ api \| claimed \| — \|/);
+    expect(ta).toMatch(/\| `ui` UI \(for Namit\) \| — \| unclaimed · blocked \| `core` \|/);
+    expect(renderSnapshot(a.getState(), syncSummary('connected'), '2026-11-14T12:00:00.000Z')).toMatch(/- Claim `core` \(Tiam \/ api\): core lib/);
+  });
+
   it('creates the file, preserves manual text, and rewrites only on change', () => {
     const { a } = populated();
     const path = join(tempDir(), 'IMPORTANT.md');

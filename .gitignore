@@ -7,3 +7,4 @@ coverage/
 # Catalyst per-project local state (databases, identities, secrets) — never commit
 .catalyst/
 .claude/settings.local.json
+__pycache__/

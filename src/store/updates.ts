@@ -1,8 +1,9 @@
 /**
  * get_updates (cursor-based feed per session, records retrieval) and acknowledge_updates (ack.recorded event).
+ * Both are per agent: the caller's own events are hidden/ineligible, sibling agents' events count like a peer's.
  */
 import type { Origin } from '../core/protocol.js';
-import { LIMITS } from '../core/protocol.js';
+import { LIMITS, agentOf } from '../core/protocol.js';
 import type { AckResult, SyncSummary, ToolInput, UpdateItem, UpdatesResult } from '../core/api.js';
 import type { EventStore, StoredEvent } from '../core/interfaces.js';
 import { pathsOverlap } from './paths-match.js';
@@ -10,13 +11,18 @@ import { DATA_NOT_INSTRUCTIONS, detailedItemLine, fitSectionsTracked, syncLines 
 
 const MAX_TEXT = 8000;
 
-export function getUpdates(store: EventStore, input: ToolInput<'get_updates'>, ctx: { session: string; sync: SyncSummary }): UpdatesResult {
+/** Written by this very agent (author me + same agent key). */
+function isOwn(store: EventStore, s: StoredEvent, agent: string): boolean {
+  return s.event.author === store.me && agentOf(s.event) === agent;
+}
+
+export function getUpdates(store: EventStore, input: ToolInput<'get_updates'>, ctx: { session: string; sync: SyncSummary; agent: string }): UpdatesResult {
   const since = input.since ?? store.getSessionCursor(ctx.session);
   const limit = Math.min(input.limit ?? 20, 50);
-  const rows = store.listSince(since, { excludeAuthor: input.includeOwn ? undefined : store.me, types: input.types });
-  const matched = rows.filter((s) => matches(store, s, input));
+  const rows = store.listSince(since, { excludeAgent: input.includeOwn ? undefined : { author: store.me, agent: ctx.agent }, types: input.types });
+  const matched = rows.filter((s) => matches(store, s, input, ctx.agent));
   const page = matched.slice(0, limit);
-  const candidates: UpdateItem[] = page.map((s) => store.toUpdateItem(s));
+  const candidates: UpdateItem[] = page.map((s) => ({ ...store.toUpdateItem(s), acknowledgedByMe: store.isAcknowledgedByMe(s.event.id, ctx.agent) }));
   const lines = candidates.map((u) => detailedItemLine(u, store.getEvent(u.id)?.event));
 
   const outcomeFor = (n: number): UpdatesResult['outcome'] =>
@@ -62,7 +68,7 @@ export function getUpdates(store: EventStore, input: ToolInput<'get_updates'>, c
   return { text, sync: ctx.sync, updates, nextCursor, hasMore, outcome };
 }
 
-function matches(store: EventStore, s: StoredEvent, input: ToolInput<'get_updates'>): boolean {
+function matches(store: EventStore, s: StoredEvent, input: ToolInput<'get_updates'>, agent: string): boolean {
   const e = s.event;
   // Peer acks are bookkeeping; only listed when explicitly requested.
   if (e.type === 'ack.recorded' && !input.types?.includes('ack.recorded')) return false;
@@ -73,7 +79,7 @@ function matches(store: EventStore, s: StoredEvent, input: ToolInput<'get_update
     const paths = [...(e.refs.paths ?? []), ...(Array.isArray(p.paths) ? (p.paths as string[]) : [])];
     if (pathsOverlap(input.paths, paths).length === 0) return false;
   }
-  if (input.unacknowledgedOnly && (e.author === store.me || store.isAcknowledgedByMe(e.id))) return false;
+  if (input.unacknowledgedOnly && (isOwn(store, s, agent) || store.isAcknowledgedByMe(e.id, agent))) return false;
   return true;
 }
 
@@ -81,10 +87,14 @@ function matches(store: EventStore, s: StoredEvent, input: ToolInput<'get_update
  * Acknowledge peer updates by id and/or up to a cursor. With neither, acknowledges exactly the records this
  * session has been shown (recorded retrievals) — never records a filter hid from it.
  */
-export function acknowledge(store: EventStore, input: ToolInput<'acknowledge_updates'>, ctx: { session: string; sync: SyncSummary; origin?: Origin }): AckResult {
+export function acknowledge(
+  store: EventStore,
+  input: ToolInput<'acknowledge_updates'>,
+  ctx: { session: string; sync: SyncSummary; origin?: Origin; agent: string },
+): AckResult {
   const ids = new Set<string>();
   const eligible = (s: StoredEvent | null): s is StoredEvent =>
-    s !== null && s.event.author !== store.me && s.event.type !== 'ack.recorded' && !store.isAcknowledgedByMe(s.event.id);
+    s !== null && !isOwn(store, s, ctx.agent) && s.event.type !== 'ack.recorded' && !store.isAcknowledgedByMe(s.event.id, ctx.agent);
 
   for (const id of input.eventIds ?? []) {
     const s = store.getEvent(id);
@@ -98,18 +108,18 @@ export function acknowledge(store: EventStore, input: ToolInput<'acknowledge_upd
   }
   const upTo = input.upToCursor;
   if (upTo !== undefined) {
-    for (const s of store.listSince(0, { excludeAuthor: store.me })) {
+    for (const s of store.listSince(0, { excludeAgent: { author: store.me, agent: ctx.agent } })) {
       if (s.cursor > upTo || ids.size >= LIMITS.ackIds) break;
       if (eligible(s)) ids.add(s.event.id);
     }
   }
   const eventIds = [...ids].slice(0, LIMITS.ackIds);
   if (eventIds.length === 0) {
-    return { text: 'Nothing to acknowledge: no unacknowledged peer updates matched.', sync: ctx.sync, acknowledged: 0 };
+    return { text: 'Nothing to acknowledge: no unacknowledged updates matched.', sync: ctx.sync, acknowledged: 0 };
   }
-  const { event } = store.append({ type: 'ack.recorded', payload: { eventIds }, origin: ctx.origin ?? 'agent', session: ctx.session });
+  const { event } = store.append({ type: 'ack.recorded', payload: { eventIds }, origin: ctx.origin ?? 'agent', session: ctx.session, agent: ctx.agent });
   return {
-    text: `Acknowledged ${eventIds.length} peer update(s) (ack event ${event.id.slice(0, 8)}, seq ${event.seq}). Your peer will see them as acknowledged after the next sync.`,
+    text: `Acknowledged ${eventIds.length} update(s) (ack event ${event.id.slice(0, 8)}, seq ${event.seq}). Your peer will see them as acknowledged after the next sync.`,
     sync: ctx.sync,
     acknowledged: eventIds.length,
     event: { id: event.id, seq: event.seq },

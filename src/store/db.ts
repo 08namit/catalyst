@@ -56,6 +56,15 @@ const MIGRATIONS: string[] = [
   CREATE TABLE forks (author TEXT NOT NULL, seq INTEGER NOT NULL, ids TEXT NOT NULL, detected_at TEXT NOT NULL);
   CREATE VIRTUAL TABLE events_fts USING fts5(id UNINDEXED, text);
   `,
+  // v2: per-agent ownership. events.agent / acks.agent = agentOf(event) ('lead' when the event has no agent field).
+  `
+  ALTER TABLE events ADD COLUMN agent TEXT NOT NULL DEFAULT 'lead';
+  CREATE INDEX events_author_agent ON events(author, agent);
+  CREATE TABLE acks_v2 (event_id TEXT NOT NULL, participant TEXT NOT NULL, agent TEXT NOT NULL, at TEXT NOT NULL, ack_id TEXT NOT NULL, PRIMARY KEY(event_id, participant, agent));
+  INSERT INTO acks_v2 (event_id, participant, agent, at, ack_id) SELECT event_id, participant, 'lead', at, ack_id FROM acks;
+  DROP TABLE acks;
+  ALTER TABLE acks_v2 RENAME TO acks;
+  `,
 ];
 
 export function openDatabase(dbPath: string, projectId: string): DatabaseSync {
