@@ -1,0 +1,1 @@
+run_id,block,condition,network,variant,completed,duration_s,decision_latency_s,manual_interventions,rework_minutes,integration_failures,recovery_s,replay_s,claude_tokens,claude_cost,notes

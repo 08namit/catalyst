@@ -154,6 +154,7 @@ All tools appear in Claude Code as `mcp__catalyst__<name>`.
 | `claim_task` / `release_task` | Advisory ownership and scope outside the queue. Warns about overlapping claims, including your own other agents. |
 | `publish_decision` | A decision or a revision of one, with rationale and code references. |
 | `publish_progress` | Status, summary, blockers, evidence, next steps, branch and commit. |
+| `checkpoint_task` | Runtime-only task plan or milestone checkpoint, kept in `.catalyst` and shared through signed sync. `take_next_task` returns the latest checkpoints when another agent resumes the task. |
 | `send_message` | A question, reply or notification to everyone, a person ("Namit") or one agent ("Namit/api"). |
 | `get_updates` / `acknowledge_updates` | Updates since this agent's cursor (including your sibling agents' work), and marking them read. |
 | `resolve_conflict` | Record the agreed outcome of a conflicting decision, claim or goal. History is kept. |
@@ -171,7 +172,7 @@ Hooks are mechanical. They never decide anything.
 | `SubagentStart` | Registers the new subagent, gives it a name and tells it how to use the queue. |
 | `SubagentStop` | Marks the subagent finished and returns its unfinished tasks to the queue. |
 | `PostToolUse` | Records `git commit`s and edited files (labelled *auto-captured*). |
-| `SessionEnd` | Publishes the touched-file summary and refreshes `IMPORTANT.md`. |
+| `SessionEnd` | Flushes touched files, releases this session's remaining claims (including subagents whose stop hook was missed), and refreshes `IMPORTANT.md`. |
 
 ### Delivery states
 
@@ -186,6 +187,17 @@ between `<!-- catalyst:handover:begin -->` and `<!-- catalyst:handover:end -->` 
 owners, decisions, open conflicts, bugs, evidence, branches and next steps. Write your own notes outside the
 markers. Two synced laptops produce identical text, so committing it causes no merge churn. If the block ever
 has merge-conflict markers, run `catalyst handover`.
+
+Task recovery uses `checkpoint_task` before work, after meaningful milestones, and before waiting or handing off.
+These detailed checkpoints stay in the local `.catalyst` event log and sync to the peer; they are not written into
+the tracked `IMPORTANT.md` handover. When a subagent stops gracefully, Catalyst saves its last checkpoint and
+releases unfinished claims so another eligible agent can take the task. The PostToolUse hook reminds an active
+agent after five edited-file events; it cannot infer the milestone's meaning, so the checkpoint remains
+agent-authored. SessionEnd releases lead claims attributed to that Claude session when the daemon is available.
+If the daemon is down at SessionEnd, those lead claims remain. A sudden process kill cannot publish a final
+checkpoint or release; after reconnect, known claim conflicts remain visible. Hooks cannot start a new Claude
+turn. A running worker using `wait_for_updates` can keep taking tasks; an idle or terminated session needs to be
+prompted or restarted.
 
 ## Outages, conflicts and recovery
 
@@ -296,6 +308,7 @@ pairing · `src/daemon` lifecycle, API, tools, agents · `src/cli` · `src/mcp` 
 `src/handover` IMPORTANT.md and snapshot · `src/dashboard/static` · `site/` · `sample/` · `examples/`.
 
 **Further reading:** [PLAN.md](PLAN.md) (plan and status), [PROTOCOL.md](PROTOCOL.md) (protocol),
-[DEMO.md](DEMO.md) (demo script and recorded evidence).
+[DEMO.md](DEMO.md) (demo script and recorded evidence), [architecture](docs/ARCHITECTURE.md),
+[two-device experiment](docs/EXPERIMENT.md), and [five-minute presentation](docs/DEMO-PRESENTATION.md).
 
 MIT licensed. See [LICENSE](LICENSE).

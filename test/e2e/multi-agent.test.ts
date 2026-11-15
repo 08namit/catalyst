@@ -134,11 +134,17 @@ describe('multi-agent e2e (real CLI, real daemons)', { concurrent: false }, () =
     await call<PublishResult>(ca, LEAD, 'post_tasks', { tasks: [{ taskId: 'notes-tests', title: 'End-to-end tests', paths: ['test/e2e.test.js'] }] });
     await waitConverged();
     await cliOk(['peer', 'pause', '--dir', B]);
-    const ta = await call<TakeTaskResult>(ca, agent('a3'), 'take_next_task');
-    const tb = await call<TakeTaskResult>(cb, agent('b2'), 'take_next_task');
-    expect(ta.pick.task?.taskId).toBe('notes-tests');
-    expect(tb.pick.task?.taskId).toBe('notes-tests');
-    await cliOk(['peer', 'resume', '--dir', B]);
+    try {
+      const ta = await call<TakeTaskResult>(ca, agent('a3'), 'take_next_task');
+      const tb = await call<TakeTaskResult>(cb, agent('b2'), 'take_next_task');
+      expect(ta.pick.reason).toBe('none_ready');
+      expect(tb.pick.reason).toBe('none_ready');
+      // Manual claims still exercise the existing advisory conflict path under a deliberate partition.
+      await call<ClaimResult>(ca, agent('a3'), 'claim_task', { taskId: 'notes-tests', scope: 'End-to-end tests', paths: ['test/e2e.test.js'] });
+      await call<ClaimResult>(cb, agent('b2'), 'claim_task', { taskId: 'notes-tests', scope: 'End-to-end tests', paths: ['test/e2e.test.js'] });
+    } finally {
+      await cliOk(['peer', 'resume', '--dir', B]);
+    }
     await waitConverged();
     for (const dir of [A, B]) {
       const s = (await state(dir)).state;

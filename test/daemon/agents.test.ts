@@ -153,6 +153,21 @@ describe('per-agent claims', () => {
     const api = h.store.getState().tasks.find((t) => t.taskId === 'api')!;
     expect(api.claims.map((c) => c.ownerAgent)).toEqual([A]);
   });
+
+  it('ignores a delayed stop draft after the same agent has reclaimed the task', async () => {
+    const { h, info } = await start();
+    const { tool } = client(info);
+    await tool('claim_task', { taskId: 'api', title: 'API', scope: 'first pass' }, A);
+    const oldClaim = h.store.getState().tasks.find((t) => t.taskId === 'api')!.claims[0]!.id;
+    await tool('release_task', { taskId: 'api' }, A);
+    await tool('claim_task', { taskId: 'api', scope: 'second pass' }, A);
+    const newClaim = h.store.getState().tasks.find((t) => t.taskId === 'api')!.claims[0]!.id;
+    expect(newClaim).not.toBe(oldClaim);
+
+    const stale = await tool('release_task', { taskId: 'api', reason: 'agent finished', expectedClaimIds: [oldClaim] }, A);
+    expect(stale.status).toBe(400);
+    expect(h.store.getState().tasks.find((t) => t.taskId === 'api')!.claims.map((c) => c.id)).toEqual([newClaim]);
+  });
 });
 
 describe('recipients', () => {
@@ -306,6 +321,24 @@ describe('wait_for_updates', () => {
 });
 
 describe('subagent lifecycle endpoints', () => {
+  it('SessionEnd releases only lead claims attributed to that linked Claude session', async () => {
+    const { h, info } = await start();
+    const { call } = client(info);
+    await call('POST', '/api/tools/claim_task', { taskId: 'one', title: 'One', scope: 'work', _caller: {} }, { 'x-catalyst-session': 'claude:s1' });
+    await call('POST', '/api/tools/claim_task', { taskId: 'two', title: 'Two', scope: 'work', _caller: {} }, { 'x-catalyst-session': 'claude:s2' });
+
+    const stop1 = await call<AgentStopResponse>('POST', '/api/agents/stop', { agentId: 'lead' }, { 'x-catalyst-client': 'hook', 'x-catalyst-session': 'claude:s1' });
+    expect(stop1.body).toEqual({ agent: 'lead', released: ['one'] });
+    expect(h.store.getState().tasks.find((t) => t.taskId === 'one')?.latestProgress.at(-1)).toMatchObject({
+      runtimeOnly: true,
+      summary: expect.stringContaining('Agent stopped before publishing'),
+    });
+    expect(h.store.getState().tasks.find((t) => t.taskId === 'two')?.claims).toHaveLength(1);
+
+    const stop2 = await call<AgentStopResponse>('POST', '/api/agents/stop', { agentId: 'lead' }, { 'x-catalyst-client': 'hook', 'x-catalyst-session': 'claude:s2' });
+    expect(stop2.body).toEqual({ agent: 'lead', released: ['two'] });
+  });
+
   it('POST /api/agents registers and introduces; /api/agents/stop releases unfinished claims', async () => {
     const { h, info } = await start();
     const { call, tool } = client(info);
@@ -321,6 +354,10 @@ describe('subagent lifecycle endpoints', () => {
 
     await tool('post_tasks', { tasks: [{ taskId: 'one', title: 'One' }, { taskId: 'two', title: 'Two' }] });
     await tool('take_next_task', {}, 'Abc-123');
+    await tool('checkpoint_task', {
+      taskId: 'one', status: 'in_progress', summary: 'Plan: inspect the parser, then add focused coverage.',
+      nextSteps: ['Inspect parser edge cases', 'Add regression coverage'],
+    }, 'Abc-123');
     await tool('claim_task', { taskId: 'two', scope: 'x' }, 'Abc-123');
     await tool('complete_task', { taskId: 'two', summary: 'done' }, 'Abc-123');
     await tool('claim_task', { taskId: 'two', scope: 'follow-up' }, 'Abc-123');
@@ -329,6 +366,12 @@ describe('subagent lifecycle endpoints', () => {
     expect(stop.body).toEqual({ agent: 'abc-123', released: ['one'] });
     const state = h.store.getState();
     expect(state.tasks.find((t) => t.taskId === 'one')?.claims).toEqual([]);
+    expect(state.tasks.find((t) => t.taskId === 'one')?.latestProgress.at(-1)).toMatchObject({
+      runtimeOnly: true,
+      agent: 'abc-123',
+      summary: 'Plan: inspect the parser, then add focused coverage.',
+      nextSteps: ['Inspect parser edge cases', 'Add regression coverage'],
+    });
     expect(state.agents.find((a) => a.agent === 'abc-123')?.active).toBe(false);
     const rel = h.store.listSince(0).find((s) => s.event.type === 'task.released' && s.event.payload.reason === 'agent finished');
     expect(rel?.event.agent).toBe('abc-123');
@@ -336,6 +379,13 @@ describe('subagent lifecycle endpoints', () => {
     const status = await call<StatusResponse>('GET', '/api/status');
     expect(status.body.agents.map((a) => a.agent)).toContain('abc-123');
     expect(status.body.queue.total).toBe(2);
+
+    const takeover = await tool<TakeTaskResult>('take_next_task', {}, B);
+    expect(takeover.body.pick.task?.taskId).toBe('one');
+    expect(takeover.body.text).toContain('Plan: inspect the parser, then add focused coverage.');
+    expect(takeover.body.text).toContain('Inspect parser edge cases');
+    await tool('complete_task', { taskId: 'one', summary: 'Finished', evidence: ['regression tests pass'] }, B);
+    expect((await tool<TakeTaskResult>('take_next_task', {}, A)).body.pick.reason).toBe('all_done');
   });
 
   it('POST /api/events attributes hook activity to the subagent in x-catalyst-agent', async () => {
@@ -388,5 +438,31 @@ describe('status, sync controls and invites', () => {
     expect(inv.status).toBe(200);
     expect(inv.body.invite.token).toMatch(/^cat1_/);
     expect(inv.body.text).toContain(`Open Claude in your copy of the repo and say: join Catalyst with ${inv.body.invite.token}`);
+  });
+});
+
+describe('bounded recovery context', () => {
+  it('only marks rendered checkpoints retrieved when a long handoff exceeds the MCP budget', async () => {
+    const { h, info } = await start();
+    const { tool } = client(info);
+    await tool('post_tasks', { tasks: [{ taskId: 'large-handoff', title: 'Large handoff' }] });
+    const ids: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const agent = `old-${i}`;
+      h.store.append({ type: 'agent.registered', payload: { agent, name: agent }, origin: 'system', agent });
+      const appended = h.store.append({ type: 'task.checkpoint', payload: {
+        taskId: 'large-handoff', status: 'in_progress', summary: `Worker ${i}: ${'details '.repeat(80)}`,
+        nextSteps: Array.from({ length: 4 }, (_, n) => `Step ${n}: ${'context '.repeat(30)}`),
+      }, origin: 'agent', agent });
+      ids.push(appended.event.id);
+    }
+    const result = await tool<TakeTaskResult>('take_next_task', { taskId: 'large-handoff' }, A);
+    expect(result.status).toBe(200);
+    expect(result.body.text.length).toBeLessThanOrEqual(8600);
+    const retrieved = new Set(h.store.retrievedBy(`mcp:test#${A}`));
+    const shown = ids.filter((id) => result.body.text.includes(`id ${id.slice(0, 8)}`));
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.length).toBeLessThan(ids.length);
+    for (const id of ids) expect(retrieved.has(id)).toBe(shown.includes(id));
   });
 });

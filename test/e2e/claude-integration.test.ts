@@ -14,7 +14,7 @@ import type { PublishResult } from '../../src/core/api.js';
 import { assertBuilt, childEnv, cleanupNodes, cli, CLI, cliOk, client, daemonProcesses, initNode, joinNode, state, status, tempDir, waitFor } from './helpers.js';
 
 const GOAL = 'Integrate Catalyst with Claude Code';
-const TOOLS = ['get_briefing', 'claim_task', 'publish_decision', 'publish_progress', 'send_message', 'get_updates', 'acknowledge_updates', 'resolve_conflict'];
+const TOOLS = ['get_briefing', 'claim_task', 'publish_decision', 'publish_progress', 'checkpoint_task', 'send_message', 'get_updates', 'acknowledge_updates', 'resolve_conflict'];
 
 describe('Claude Code integration e2e', { concurrent: false }, () => {
   let A = '';

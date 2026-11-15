@@ -168,6 +168,18 @@ const queueTask = z
   })
   .strict();
 
+const progressInputShape = {
+  taskId: slugSchema.optional(),
+  status: z.enum(PROGRESS_STATUSES),
+  summary: text(LIMITS.text),
+  blockers: list().optional(),
+  evidence: list(LIMITS.text).optional().describe('Verification evidence, e.g. "npm test: 42 passed"'),
+  nextSteps: list().optional(),
+  branch: text(200).optional(),
+  commit: z.string().regex(/^[0-9a-f]{7,40}$/).optional(),
+  paths: pathsSchema.optional(),
+};
+
 const baseToolInputShapes = {
   get_briefing: {
     task: slugSchema.optional().describe('Task id to focus on, e.g. "api-auth"'),
@@ -186,6 +198,7 @@ const baseToolInputShapes = {
   release_task: {
     taskId: slugSchema,
     reason: text(LIMITS.short).optional(),
+    expectedClaimIds: z.array(eventIdSchema).max(50).optional().describe('Optional safety guard for queued stop drafts: release only these observed live claim ids; stale ids do not release newer claims.'),
   },
   publish_decision: {
     topic: slugSchema.describe('Decision topic slug, e.g. "api/auth-format"'),
@@ -199,16 +212,11 @@ const baseToolInputShapes = {
     taskId: slugSchema.optional(),
     paths: pathsSchema.optional(),
   },
-  publish_progress: {
-    taskId: slugSchema.optional(),
-    status: z.enum(PROGRESS_STATUSES),
-    summary: text(LIMITS.text),
-    blockers: list().optional(),
-    evidence: list(LIMITS.text).optional().describe('Verification evidence, e.g. "npm test: 42 passed"'),
-    nextSteps: list().optional(),
-    branch: text(200).optional(),
-    commit: z.string().regex(/^[0-9a-f]{7,40}$/).optional(),
-    paths: pathsSchema.optional(),
+  publish_progress: progressInputShape,
+  checkpoint_task: {
+    ...progressInputShape,
+    taskId: slugSchema.describe('Task being checkpointed; required for recovery'),
+    status: z.enum(['in_progress', 'blocked']),
   },
   send_message: {
     kind: z.enum(MESSAGE_KINDS),

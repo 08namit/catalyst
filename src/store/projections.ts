@@ -103,6 +103,8 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
     claimFamily: CatalystEvent[];
     /** Latest progress per ownerKey (author/agent). */
     progressByAgent: Map<string, ProgressView>;
+    /** Runtime-only task recovery checkpoints, kept separate so they cannot reopen completed work. */
+    checkpointsByAgent: Map<string, ProgressView>;
     dependsOn: string[];
     assignee: string;
     explicitOrder?: number;
@@ -113,7 +115,7 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
   const task = (taskId: string): TaskBuilder => {
     let t = tasks.get(taskId);
     if (!t) {
-      t = { taskId, paths: [], claimFamily: [], progressByAgent: new Map(), dependsOn: [], assignee: 'any' };
+      t = { taskId, paths: [], claimFamily: [], progressByAgent: new Map(), checkpointsByAgent: new Map(), dependsOn: [], assignee: 'any' };
       tasks.set(taskId, t);
     }
     return t;
@@ -221,6 +223,24 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
         const key = ownerKey(e.author, agentOf(e));
         if (p.taskId) task(p.taskId).progressByAgent.set(key, view);
         else generalProgress.set(key, view);
+        break;
+      }
+      case 'task.checkpoint': {
+        const p = e.payload as PayloadOf<'task.checkpoint'>;
+        const key = ownerKey(e.author, agentOf(e));
+        const view: ProgressView = {
+          ...ref(e),
+          taskId: p.taskId,
+          status: p.status,
+          summary: p.summary,
+          blockers: p.blockers ?? [],
+          evidence: p.evidence ?? [],
+          nextSteps: p.nextSteps ?? [],
+          branch: p.branch,
+          commit: p.commit,
+          runtimeOnly: true,
+        };
+        task(p.taskId).checkpointsByAgent.set(key, view);
         break;
       }
       case 'issue.reported': {
@@ -333,7 +353,8 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
       .filter((c): c is ClaimView => c !== undefined);
     const owners = [...new Set(claims.map((c) => c.owner))];
     const ownerKeys = [...new Set(claims.map((c) => c.ownerKey))];
-    const latestProgress = [...t.progressByAgent.values()].sort((a, b) => position.get(a.id)! - position.get(b.id)!);
+    const progress = [...t.progressByAgent.values()];
+    const latestProgress = [...progress, ...t.checkpointsByAgent.values()].sort((a, b) => position.get(a.id)! - position.get(b.id)!);
     const blockers = [
       ...latestProgress.flatMap((p) => p.blockers),
       ...issueList.filter((i) => i.taskId === t.taskId && i.kind === 'blocker' && i.status === 'open').map((i) => i.title),
@@ -348,7 +369,7 @@ export function project(events: CatalystEvent[], me: string, forks: ForkAlarm[] 
       owners,
       ownerKeys,
       latestProgress,
-      status: latestProgress.at(-1)?.status ?? (claims.length > 0 ? 'claimed' : 'unclaimed'),
+      status: progress.sort((a, b) => position.get(a.id)! - position.get(b.id)!).at(-1)?.status ?? (claims.length > 0 ? 'claimed' : 'unclaimed'),
       openBlockers: [...new Set(blockers)],
       claimConflict: ownerKeys.length > 1,
       dependsOn: t.dependsOn,

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { preToolUseOutput, runHook } from '../../src/hooks/entry.js';
@@ -86,6 +86,52 @@ describe('subagent-start / subagent-stop', () => {
     expect(daemon.requests.find((r) => r.path === '/api/agents/stop')?.body).toEqual({ agentId: 'a1' });
     expect(existsSync(join(dir, '.catalyst', 'sessions', `${SID}--a1.touched`))).toBe(false);
     expect(out.join('')).toBe('');
+  });
+
+  it('reminds an agent to checkpoint after five edited-file hooks on its claimed task', async () => {
+    const dir = makeProject();
+    writeFileSync(join(dir, '.catalyst', 'snapshot.json'), JSON.stringify({
+      state: { me: 'p_local', tasks: [{ taskId: 'api', claims: [{ owner: 'p_local', ownerAgent: 'a1' }] }] },
+    }));
+    for (let i = 0; i < 5; i++) {
+      await runHook('post-tool-use', {
+        dir,
+        input: { session_id: SID, agent_id: 'a1', tool_name: 'Edit', tool_input: { file_path: join(dir, 'src', `file-${i}.ts`) } },
+      });
+    }
+    const result = JSON.parse(out.join('')) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+    expect(result.hookSpecificOutput.hookEventName).toBe('PostToolUse');
+    expect(result.hookSpecificOutput.additionalContext).toContain('Call checkpoint_task');
+  });
+
+  it('drafts the last task checkpoint and release when SubagentStop finds the daemon down', async () => {
+    const dir = makeProject();
+    writeFileSync(join(dir, '.catalyst', 'snapshot.json'), JSON.stringify({
+      state: {
+        me: 'p_local',
+        tasks: [{
+          taskId: 'api', status: 'in_progress',
+          claims: [{ id: 'a'.repeat(64), owner: 'p_local', ownerAgent: 'a1' }],
+          latestProgress: [{ author: 'p_local', agent: 'a1', status: 'in_progress', summary: 'Earlier public progress' }, { author: 'p_local', agent: 'a1', runtimeOnly: true, status: 'blocked', summary: 'Parser still fails on empty input.', blockers: ['Need fixture'], evidence: [], nextSteps: ['Add fixture'] }],
+        }, {
+          taskId: `${'x'.repeat(50)}a`, status: 'in_progress', claims: [{ id: 'b'.repeat(64), owner: 'p_local', ownerAgent: 'a1' }], latestProgress: [],
+        }, {
+          taskId: `${'x'.repeat(50)}b`, status: 'in_progress', claims: [{ id: 'c'.repeat(64), owner: 'p_local', ownerAgent: 'a1' }], latestProgress: [],
+        }],
+      },
+    }));
+    await runHook('subagent-stop', { dir, input: { session_id: SID, agent_id: 'a1' } });
+    const inbox = join(dir, '.catalyst', 'inbox');
+    const drafts = readdirSync(inbox).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(inbox, f), 'utf8')) as Record<string, unknown>);
+    expect(drafts).toHaveLength(6);
+    expect(drafts.find((d) => d.tool === 'checkpoint_task' && (d.input as Record<string, unknown>).taskId === 'api')?.input).toMatchObject({
+      taskId: 'api', status: 'blocked', summary: 'Parser still fails on empty input.', nextSteps: ['Add fixture'],
+    });
+    expect(drafts.find((d) => d.tool === 'release_task' && (d.input as Record<string, unknown>).taskId === 'api')?.input).toMatchObject({
+      taskId: 'api', reason: 'agent finished', expectedClaimIds: ['a'.repeat(64)],
+    });
+    const releases = drafts.filter((d) => d.tool === 'release_task');
+    expect(new Set(releases.map((d) => d.clientId)).size).toBe(3);
   });
 
   it('a commit made inside a subagent carries the agent', async () => {

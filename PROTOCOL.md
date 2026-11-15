@@ -338,3 +338,29 @@ generation time, the sync state and the projected state.
 - Text outside the block is preserved.
 - Updates still awaiting synchronisation are reported live by `get_briefing` and the `SessionStart` hook, not in
   the committed file.
+
+
+## Runtime task checkpoints (recovery extension)
+
+`checkpoint_task` appends a signed `task.checkpoint` event with a required task id, `in_progress` or `blocked`
+status, summary, and optional blockers, evidence, next steps, branch and commit. It uses the ordinary append-only
+log, signature verification, replay and delivery/consumption tracking; there is no second document transfer channel.
+All paired participants can receive these records. Runtime-only means excluded from Git-visible generated handover
+content, not confidential from a paired teammate.
+
+The projection treats these as per-task, per-agent recovery progress. The generated root `IMPORTANT.md` omits
+checkpoint summaries, blockers, evidence, next steps and code references; the ignored `.catalyst/snapshot.md` and
+`.catalyst/snapshot.json` retain them. Public `publish_progress` remains exported as before. Agents must not copy
+runtime recovery details into public progress, task descriptions or repository notes if they want them excluded
+from Git. Gitignore is a default exclusion, not protection against an explicit force-add.
+
+This additive event uses the existing protocol-v2 envelope. Earlier v2 implementations store and relay unknown
+event types without projecting them, so they cannot offer checkpoint recovery. Both devices must use the recovery
+build for this workflow. It does not make protocol v1 compatible with v2.
+
+On a confirmed graceful subagent stop, preserve its last checkpoint and release unfinished claims; other running
+queue workers can take the released work. A lost peer connection does not release that peer's claims. During known
+peer unavailability, queue selection is restricted to existing ownership, local assignments and eligible local
+handoffs; explicit requests obey the same partition restriction. Claims remain advisory: partitions and stale
+information cannot guarantee global exclusive ownership. Publish source commits through Git before a cross-device
+handoff; Catalyst never transfers dirty worktrees or automatically executes code from checkpoint text.

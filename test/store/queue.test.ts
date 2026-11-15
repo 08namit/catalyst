@@ -6,6 +6,7 @@ import { makeNode, makePair, sync } from './helpers.js';
 
 const X = 'a7a6a241124692d30';
 const Y = 'b1c2d3e4f5a6b7c8d';
+const Z = 'c1d2e3f4a5b6c7d8e';
 
 function post(s: SqliteEventStore, taskId: string, extra: { dependsOn?: string[]; assignee?: string; order?: number; paths?: string[] } = {}) {
   return s.append({ type: 'task.created', payload: { taskId, title: taskId.toUpperCase(), ...extra }, origin: 'agent' }).event;
@@ -85,6 +86,25 @@ describe('pickNextTask', () => {
     expect(pickNextTask(s.getState(), s.me, X, { taskId: 'nope' })).toMatchObject({ reason: 'not_found', task: null });
     done(s, 'core', X);
     expect(pickNextTask(s.getState(), s.me, X, { taskId: 'core' })).toMatchObject({ reason: 'already_done', task: { taskId: 'core' } });
+  });
+
+  it('can restrict outage picks to locally assigned or explicitly released work, including explicit requests', () => {
+    const s = makeNode(newProjectId(), 'Tiam', true);
+    post(s, 'any-work', { order: 0 });
+    post(s, 'local-work', { assignee: s.me, order: 1 });
+    post(s, 'stopped-work', { order: 2 });
+    post(s, 'claimed-elsewhere', { order: 3 });
+    post(s, 'resume-work', { order: 4 });
+    const stoppedClaim = take(s, 'stopped-work', X);
+    s.append({ type: 'task.released', payload: { taskId: 'stopped-work', reason: 'agent finished' }, supersedes: [stoppedClaim.id], origin: 'hook', agent: X });
+    take(s, 'claimed-elsewhere', Y);
+    take(s, 'resume-work', X);
+    const allowedTaskIds = new Set(['local-work', 'stopped-work']);
+
+    expect(pickNextTask(s.getState(), s.me, Z, { allowedTaskIds })).toMatchObject({ reason: 'next', task: { taskId: 'local-work' } });
+    expect(pickNextTask(s.getState(), s.me, Z, { taskId: 'any-work', allowedTaskIds })).toMatchObject({ reason: 'none_ready', task: null });
+    expect(pickNextTask(s.getState(), s.me, Z, { taskId: 'claimed-elsewhere', allowedTaskIds })).toMatchObject({ reason: 'none_ready', task: null });
+    expect(pickNextTask(s.getState(), s.me, X, { allowedTaskIds: new Set() })).toMatchObject({ reason: 'resume', task: { taskId: 'resume-work' } });
   });
 });
 

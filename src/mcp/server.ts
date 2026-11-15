@@ -44,7 +44,7 @@ Setup (no terminal needed): start_project creates the project here; invite_teamm
 
 Workflow:
 - The lead (main session) posts work with post_tasks, then spawns subagents.
-- Agents call take_next_task, do the work, publish_decision before code others depend on, then complete_task with evidence and take_next_task again.
+- Agents call take_next_task, checkpoint_task with a plan before editing and at milestones, publish_decision before code others depend on, then complete_task with evidence and take_next_task again.
 - When blocked or waiting for an answer, call wait_for_updates instead of stopping. Ask with send_message instead of guessing.
 - get_briefing at the start of other work; get_updates/acknowledge_updates when told about new updates; resolve_conflict only after the parties agreed.
 
@@ -76,6 +76,11 @@ const TOOL_META: Record<ToolName, { title: string; description: string }> = {
     title: 'Publish progress',
     description:
       'Report progress at milestones and before ending a session: status, a concise summary, blockers, verification evidence (e.g. "npm test: 42 passed") and next steps; optionally branch/commit and task. This is the agent-authored summary the teammate relies on — automatic commit/file capture is not a substitute.',
+  },
+  checkpoint_task: {
+    title: 'Checkpoint task',
+    description:
+      'Save a runtime-only plan or milestone for a queued task. Call before editing, after meaningful milestones, and before waiting or handing off; include summary, blockers, evidence and concrete next steps. Checkpoints are signed and synced with the project but stay out of tracked IMPORTANT.md. take_next_task shows the latest checkpoints when another agent continues the task. Use complete_task to mark work done.',
   },
   send_message: {
     title: 'Send a message',

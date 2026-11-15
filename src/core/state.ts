@@ -72,6 +72,8 @@ export interface ClaimView extends SourceRef {
 }
 
 export interface ProgressView extends SourceRef {
+  /** Recovery checkpoint: share through Catalyst runtime, never export its content to project handover files. */
+  runtimeOnly?: boolean;
   taskId?: string;
   status: string;
   summary: string;

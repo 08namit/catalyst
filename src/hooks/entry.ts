@@ -7,7 +7,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { CatalystClient, DaemonUnavailableError } from '../client/index.js';
 import { createLogger, type Logger } from '../core/log.js';
@@ -172,12 +172,74 @@ async function subagentStop(ctx: Ctx): Promise<void> {
     up = false;
   }
   await flushTouched(ctx, client, up, touchedFile(ctx), input.agent_id);
-  if (!up) return;
+  if (!up) {
+    draftStoppedTasks(ctx, input.agent_id);
+    return;
+  }
   try {
     await client.post('/api/agents/stop', { agentId: input.agent_id.slice(0, 100) });
   } catch (err) {
     log.warn('subagent stop failed', err);
+    draftStoppedTasks(ctx, input.agent_id);
   }
+}
+
+/** Preserve known task recovery context and queue releases when a graceful stop finds the daemon offline. */
+function draftStoppedTasks(ctx: Ctx, agentId: string): void {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(ctx.paths.snapshotJson, 'utf8'));
+  } catch {
+    return;
+  }
+  const state = (raw as { state?: { tasks?: Array<Record<string, unknown>> } } | null)?.state;
+  const tasks = Array.isArray(state?.tasks) ? state.tasks : [];
+  const agent = agentId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 64) || 'lead';
+  for (const task of tasks) {
+    const taskId = typeof task.taskId === 'string' ? task.taskId : '';
+    if (task.status === 'done' || task.status === 'abandoned') continue;
+    const claims = Array.isArray(task.claims) ? task.claims as Array<Record<string, unknown>> : [];
+    const me = (raw as { state?: { me?: string } }).state?.me;
+    const myClaims = claims.filter((c) => c.owner === me && c.ownerAgent === agent);
+    if (!taskId || myClaims.length === 0) continue;
+    const progress = Array.isArray(task.latestProgress)
+      ? [...(task.latestProgress as Array<Record<string, unknown>>)].reverse().find((p) => p.author === (raw as { state?: { me?: string } }).state?.me && p.agent === agent)
+      : undefined;
+    writeInboxDraft(ctx.paths, {
+      catalystDraft: 1,
+      clientId: stopDraftId('checkpoint', ctx, agent, taskId),
+      tool: 'checkpoint_task',
+      input: {
+        _caller: { agentId, agentType: ctx.input.agent_type },
+        taskId,
+        status: progress?.status === 'blocked' ? 'blocked' : 'in_progress',
+        summary: typeof progress?.summary === 'string' ? progress.summary : 'Agent stopped before publishing a task checkpoint; inspect the worktree and continue from the current state.',
+        ...(Array.isArray(progress?.blockers) ? { blockers: progress.blockers } : {}),
+        ...(Array.isArray(progress?.evidence) ? { evidence: progress.evidence } : {}),
+        ...(Array.isArray(progress?.nextSteps) ? { nextSteps: progress.nextSteps } : {}),
+        ...(typeof progress?.branch === 'string' ? { branch: progress.branch } : {}),
+        ...(typeof progress?.commit === 'string' ? { commit: progress.commit } : {}),
+      },
+      writtenAt: new Date().toISOString(),
+    });
+    writeInboxDraft(ctx.paths, {
+      catalystDraft: 1,
+      clientId: stopDraftId('release', ctx, agent, taskId),
+      tool: 'release_task',
+      input: {
+        _caller: { agentId, agentType: ctx.input.agent_type },
+        taskId,
+        reason: 'agent finished',
+        expectedClaimIds: myClaims.map((c) => c.id).filter((id): id is string => typeof id === 'string'),
+      },
+      writtenAt: new Date().toISOString(),
+    });
+  }
+}
+
+function stopDraftId(kind: string, ctx: Ctx, agent: string, taskId: string): string {
+  const identity = createHash('sha256').update(`${ctx.sessionKey}\0${agent}\0${taskId}`).digest('hex').slice(0, 40);
+  return `stop-${kind}-${identity}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -205,10 +267,38 @@ async function userPromptSubmit(ctx: Ctx): Promise<void> {
     u = await client.get<UnreadSummary>(`/api/unread?session=${encodeURIComponent(ctx.label)}&markNotified=1`);
   } catch (err) {
     ctx.log.debug('unread check skipped', err);
+    const reminder = checkpointReminder(ctx);
+    if (reminder) process.stdout.write(reminder + '\n');
     return;
   }
   const line = formatUnreadLine(u);
-  if (line) process.stdout.write(line + '\n');
+  const reminder = checkpointReminder(ctx);
+  const notices = [line, reminder].filter((x): x is string => !!x);
+  if (notices.length) process.stdout.write(notices.join('\n') + '\n');
+}
+
+/** Nudge an agent with a live task after every five captured file edits since its prior reminder. */
+function checkpointReminder(ctx: Ctx): string | null {
+  const touched = touchedFile(ctx);
+  if (!existsSync(touched)) return null;
+  let snapshot: { state?: { me?: string; tasks?: Array<Record<string, unknown>> } };
+  try {
+    snapshot = JSON.parse(readFileSync(ctx.paths.snapshotJson, 'utf8')) as typeof snapshot;
+  } catch {
+    return null;
+  }
+  const me = snapshot.state?.me;
+  const agent = ctx.agentFileKey || 'lead';
+  const tasks = Array.isArray(snapshot.state?.tasks) ? snapshot.state.tasks : [];
+  const owned = tasks.some((t) => Array.isArray(t.claims) && (t.claims as Array<Record<string, unknown>>).some((c) => c.owner === me && c.ownerAgent === agent));
+  if (!owned) return null;
+  const count = readFileSync(touched, 'utf8').split('\n').filter(Boolean).length;
+  const reminderFile = join(ctx.paths.dataDir, 'sessions', `${ctx.sessionKey}--${ctx.agentFileKey || 'lead'}.checkpoint-reminder`);
+  let last = 0;
+  try { last = Number(readFileSync(reminderFile, 'utf8')) || 0; } catch { /* first reminder */ }
+  if (count - last < 5) return null;
+  writeFileSync(reminderFile, String(count));
+  return 'Catalyst: several file-edit events have been captured. Call checkpoint_task with any new milestone, blockers, evidence and next steps before continuing.';
 }
 
 export function formatUnreadLine(u: UnreadSummary): string | null {
@@ -262,6 +352,10 @@ async function postToolUse(ctx: Ctx): Promise<void> {
     const file = touchedFile(ctx);
     mkdirSync(dirname(file), { recursive: true });
     appendFileSync(file, rel.split('\\').join('/') + '\n');
+    const reminder = checkpointReminder(ctx);
+    if (reminder) {
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: reminder } }));
+    }
   }
 }
 
@@ -292,10 +386,22 @@ async function sessionEnd(ctx: Ctx): Promise<void> {
   if (existsSync(dir)) {
     for (const f of readdirSync(dir)) {
       if (!f.startsWith(prefix) || !f.endsWith('.touched')) continue;
-      await flushTouched(ctx, client, up, join(dir, f), f.slice(prefix.length, -'.touched'.length));
+      const agentId = f.slice(prefix.length, -'.touched'.length);
+      await flushTouched(ctx, client, up, join(dir, f), agentId);
+      if (up) {
+        await client.post('/api/agents/stop', { agentId }).catch((err: unknown) => {
+          log.warn('subagent stop at session end failed', err);
+          draftStoppedTasks(ctx, agentId);
+        });
+      } else {
+        draftStoppedTasks(ctx, agentId);
+      }
     }
   }
-  if (up) await client.post('/api/handover').catch((err: unknown) => log.warn('handover regeneration failed', err));
+  if (up) {
+    await client.post('/api/agents/stop', { agentId: 'lead' }).catch((err: unknown) => log.warn('lead session stop failed', err));
+    await client.post('/api/handover').catch((err: unknown) => log.warn('handover regeneration failed', err));
+  }
 }
 
 /** Post one touched-files list as a files activity (as `agentId` when given), or draft it; then delete the list. */

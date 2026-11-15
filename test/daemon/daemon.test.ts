@@ -305,3 +305,21 @@ describe('unread summary', () => {
     expect(h.store.getSessionCursor('s1')).toBe(0);
   });
 });
+
+describe('checkpoint-only snapshot refresh', () => {
+  it('refreshes the ignored fallback after a milestone without exporting that content to IMPORTANT.md', async () => {
+    const dir = makeProject();
+    const { info } = await start(dir);
+    const paths = projectPaths(dir);
+    await api(info, 'POST', '/api/tools/post_tasks', { tasks: [{ taskId: 'checkpoint-refresh', title: 'Checkpoint refresh' }] });
+    await api(info, 'POST', '/api/tools/take_next_task', { taskId: 'checkpoint-refresh' });
+    const saved = await api(info, 'POST', '/api/tools/checkpoint_task', {
+      taskId: 'checkpoint-refresh', status: 'in_progress', summary: 'LATEST_RUNTIME_ONLY_MILESTONE', nextSteps: ['PRIVATE_NEXT_ACTION'],
+    });
+    expect(saved.status).toBe(200);
+    await expect.poll(() => existsSync(paths.snapshotJson) ? readFileSync(paths.snapshotJson, 'utf8') : '', { timeout: 3000 }).toContain('LATEST_RUNTIME_ONLY_MILESTONE');
+    await api(info, 'POST', '/api/handover');
+    const handover = readFileSync(paths.handover, 'utf8');
+    expect(handover).not.toMatch(/LATEST_RUNTIME_ONLY_MILESTONE|PRIVATE_NEXT_ACTION/);
+  });
+});

@@ -3,7 +3,42 @@
 > Read this before starting work. Update it when goals, decisions, ongoing tasks or known bugs materially change,
 > and before ending a session. No credentials here. Keep conflicting entries side by side for review.
 
-**Last update:** 2026-11-14 23:59 GMT — Tiam's lead agent (Claude Opus 5.5)
+**Last update:** 2026-11-15 GMT — Codex recovery feature and demo preparation
+
+## Recovery feature and two-device study — 2026-11-15
+- User goal: explain/critique the stack, prepare an honest Catalyst vs Git+repository-notes comparison,
+  and add lean shared recovery checkpoints outside Git. Three GPT-6 Luna subagents handled review,
+  experiment/presentation documentation, and implementation; lead integrated and reviewed.
+- Isolated branch `feature/agent-recovery`, based on local `v0.2-agents` (`ac5d01f`), worktree
+  `/private/tmp/catalyst-agent-recovery`. Main and website branches are not merged. Original website
+  edits and untracked `notes-demo/` remain in the original checkout.
+- Added MCP `checkpoint_task` and signed `task.checkpoint` runtime events, automatic initial scope records,
+  milestone reminders after five edited-file hook events, takeover context, graceful-stop checkpoint/release,
+  session-scoped lead cleanup, and observed-claim guards on delayed stop releases. Lead approved the narrow
+  core API/event/state extensions; sync frames and protocol version remain unchanged. Older v2 peers relay
+  unknown checkpoint events but need this build to project/use them.
+- Checkpoint details stay in ignored `.catalyst` SQLite/snapshots/inbox and sync through the normal peer link;
+  they are excluded from generated root IMPORTANT.md. Public publish_progress remains Git-visible as before.
+  Recovery events do not determine task completion status; late checkpoints cannot reopen finished work.
+- During known peer unavailability, queue picks (including explicit requests) preserve claims and restrict
+  new work to local assignments/eligible local handoffs. Manual claim_task remains advisory; no distributed
+  lock or claim of zero conflicts under an unseen partition. Git still transfers code, not Catalyst.
+- Verification: typecheck; 197 unit/integration tests; build; 26 end-to-end tests (two real local daemons,
+  simulated agent calls, including checkpoint replay/takeover/privacy); existing two-node demo all passed.
+  Six Python result-validation tests passed; chart generation smoke-tested using synthetic QA data only.
+  `git diff --check` passed. No new physical two-device runs or comparison measurements claimed.
+- Docs: `docs/ARCHITECTURE.md`, `docs/EXPERIMENT.md`, `docs/DEMO-PRESENTATION.md`; header-only results
+  template and `scripts/experiment-results.py` generate PNG/SVG/JSON only from supplied measurements.
+- Confirmed study: Tiam + Namit, macOS, same Wi-Fi and Claude model; baseline Git + tracked notes only,
+  no chat; 180-second peer-sync pause keeping Claude/Git online. Five-minute judging slot: measure beforehand,
+  show measured graphs and a clearly labelled shortened live illustration. Preserve raw evidence outside Git.
+- Remaining limits: hard kill/power loss cannot send a final checkpoint or release; no agent supervisor or
+  crash detector is implemented. Lead SessionEnd while daemon is down retains claims; best-effort MCP/hook
+  session linking can retain unattributed lead claims. Offline stop drafts depend on last saved snapshot;
+  stop metadata may still say active; general liveness reconciliation is not implemented. Hooks do not start idle Claude turns.
+  A running worker can wait/take tasks autonomously; cross-laptop takeover requires the source commit in Git.
+- Next: make the same feature build available on both Macs, re-pair fresh v2 demo projects, run the study,
+  retain measurements/failed trials, then generate graphs. No branch push, release, or main merge performed.
 
 ## Current goal
 Catalyst v0.1: connect two developers' Claude Code sessions (Tiam, Namit) via a per-project daemon, MCP adapter,

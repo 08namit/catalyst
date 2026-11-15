@@ -55,9 +55,10 @@ export function summarizeEvent(e: CatalystEvent, name: Namer = (p) => p): string
       s = `Decision [${q.status}] ${q.topic}: ${q.title} — ${q.decision}`;
       break;
     }
+    case 'task.checkpoint':
     case 'progress.reported': {
       const q = p as PayloadOf<'progress.reported'>;
-      s = `Progress${q.taskId ? ` on ${q.taskId}` : ''} [${q.status}]: ${q.summary}${q.blockers?.length ? ` (blockers: ${q.blockers.join('; ')})` : ''}`;
+      s = `${e.type === 'task.checkpoint' ? 'Checkpoint' : 'Progress'}${q.taskId ? ` on ${q.taskId}` : ''} [${q.status}]: ${q.summary}${q.blockers?.length ? ` (blockers: ${q.blockers.join('; ')})` : ''}`;
       break;
     }
     case 'issue.reported': {
@@ -138,6 +139,7 @@ export function detailLines(e: CatalystEvent | undefined): string {
     case 'conflict.resolved':
       add('Resolution', (e.payload as PayloadOf<'conflict.resolved'>).resolution, 1500);
       break;
+    case 'task.checkpoint':
     case 'progress.reported': {
       const q = e.payload as PayloadOf<'progress.reported'>;
       if (q.evidence?.length) add('Evidence', q.evidence.join('; '), 600);

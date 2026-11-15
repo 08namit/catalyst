@@ -418,19 +418,44 @@ function registerAgent(ctx: DaemonContext, body: z.infer<typeof agentRegisterReq
 function stopAgent(ctx: DaemonContext, body: z.infer<typeof agentStopRequestSchema>, r: Req): AgentStopResponse {
   const { store } = ctx;
   const agent = agentKeyFromId(body.agentId);
-  if (agent === LEAD_AGENT) return { agent, released: [] };
   const origin = ORIGIN_BY_CLIENT[r.client];
   const session = agentSession(r.session, agent);
   const key = ownerKey(store.me, agent);
   const released: string[] = [];
+  const registration = latestRegistration(store, agent);
+  const linked = agent === LEAD_AGENT ? linkSessions(store.listSessions()).find((s) => s.id === r.session)?.linkedSession : undefined;
+  const allowedSessions = new Set([r.session, ...(linked ? [linked] : [])]);
   for (const t of store.getState().tasks) {
-    const mine = t.claims.filter((c) => c.ownerKey === key).map((c) => c.id);
-    if (mine.length === 0 || t.status === 'done') continue;
+    const mine = t.claims
+      .filter((c) => c.ownerKey === key)
+      .filter((c) => agent !== LEAD_AGENT || allowedSessions.has(store.getEvent(c.id)?.event.session ?? ''))
+      .map((c) => c.id);
+    if (mine.length === 0 || t.status === 'done' || t.status === 'abandoned') continue;
+    // A graceful stop is the last chance to leave a durable recovery point before returning work to the queue.
+    // Preserve the agent's latest useful checkpoint verbatim; do not infer progress from activity or the claim.
+    const previous = [...t.latestProgress].reverse().find((p) => p.author === store.me && p.agent === agent);
+    const status = previous?.status === 'blocked' ? 'blocked' : 'in_progress';
+    store.append({
+      type: 'task.checkpoint',
+      payload: {
+        taskId: t.taskId,
+        status,
+        summary: previous?.summary ?? 'Agent stopped before publishing a task checkpoint; inspect the worktree and continue from the current state.',
+        ...(previous?.blockers.length ? { blockers: previous.blockers } : {}),
+        ...(previous?.evidence.length ? { evidence: previous.evidence } : {}),
+        ...(previous?.nextSteps.length ? { nextSteps: previous.nextSteps } : {}),
+        ...(previous?.branch ? { branch: previous.branch } : {}),
+        ...(previous?.commit ? { commit: previous.commit } : {}),
+      },
+      refs: { task: t.taskId },
+      origin,
+      session,
+      agent,
+    });
     store.append({ type: 'task.released', payload: { taskId: t.taskId, reason: 'agent finished' }, refs: { task: t.taskId }, supersedes: mine, origin, session, agent });
     released.push(t.taskId);
   }
-  const prev = latestRegistration(store, agent);
-  if (prev?.active) appendRegistration(store, { agent, name: prev.name, ...(prev.agentType ? { agentType: prev.agentType } : {}), active: false, origin, session });
+  if (agent !== LEAD_AGENT && registration?.active) appendRegistration(store, { agent, name: registration.name, ...(registration.agentType ? { agentType: registration.agentType } : {}), active: false, origin, session });
   return { agent, released };
 }
 

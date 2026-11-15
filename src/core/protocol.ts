@@ -133,6 +133,7 @@ export const EVENT_TYPES = [
   'task.released',
   'decision.recorded',
   'progress.reported',
+  'task.checkpoint',
   'issue.reported',
   'issue.resolved',
   'message.posted',
@@ -281,6 +282,17 @@ export const ISSUE_KINDS = ['bug', 'blocker', 'risk'] as const;
 export const CONFLICT_SCOPES = ['decision', 'claim', 'goal'] as const;
 export const ACTIVITY_KINDS = ['commit', 'files', 'session'] as const;
 
+const progressPayloadSchema = z.object({
+  taskId: slugSchema.optional(),
+  status: z.enum(PROGRESS_STATUSES),
+  summary: str(LIMITS.text),
+  blockers: strList().optional(),
+  evidence: strList(LIMITS.listItems, LIMITS.text).optional(),
+  nextSteps: strList().optional(),
+  branch: str(200).optional(),
+  commit: z.string().regex(/^[0-9a-f]{7,40}$/).optional(),
+});
+
 export const payloadSchemas = {
   'project.created': z.object({ name: str(LIMITS.title), description: str(LIMITS.text).optional() }),
   'participant.joined': z.object({ name: str(80), publicKey: z.string().min(40).max(200), role: str(LIMITS.short).optional() }),
@@ -308,16 +320,9 @@ export const payloadSchemas = {
     codeRefs: strList(LIMITS.listItems, LIMITS.pathLength).optional(),
     alternatives: strList().optional(),
   }),
-  'progress.reported': z.object({
-    taskId: slugSchema.optional(),
-    status: z.enum(PROGRESS_STATUSES),
-    summary: str(LIMITS.text),
-    blockers: strList().optional(),
-    evidence: strList(LIMITS.listItems, LIMITS.text).optional(),
-    nextSteps: strList().optional(),
-    branch: str(200).optional(),
-    commit: z.string().regex(/^[0-9a-f]{7,40}$/).optional(),
-  }),
+  'progress.reported': progressPayloadSchema,
+  // Runtime-only recovery context. Older v2 peers store/relay unknown events without projecting them.
+  'task.checkpoint': progressPayloadSchema.extend({ taskId: slugSchema, status: z.enum(['in_progress', 'blocked']) }),
   'issue.reported': z.object({ kind: z.enum(ISSUE_KINDS), title: str(LIMITS.title), detail: str(LIMITS.text).optional(), taskId: slugSchema.optional() }),
   'issue.resolved': z.object({ issueId: eventIdSchema, note: str(LIMITS.short).optional() }),
   'message.posted': z.object({

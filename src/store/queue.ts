@@ -17,7 +17,7 @@ function waitingOn(state: ProjectState, t: TaskView): string[] {
   return t.dependsOn.filter((d) => state.tasks.find((x) => x.taskId === d)?.status !== 'done');
 }
 
-export function pickNextTask(state: ProjectState, me: string, agent: string, opts: { taskId?: string } = {}): QueuePick {
+export function pickNextTask(state: ProjectState, me: string, agent: string, opts: { taskId?: string; allowedTaskIds?: ReadonlySet<string> } = {}): QueuePick {
   const key = ownerKey(me, agent);
   const tasks = [...state.tasks].sort(byQueueOrder);
   const remaining = tasks.filter((t) => !finished(t)).length;
@@ -30,7 +30,8 @@ export function pickNextTask(state: ProjectState, me: string, agent: string, opt
   if (opts.taskId !== undefined) {
     const t = tasks.find((x) => x.taskId === opts.taskId);
     if (!t) return pick(null, 'not_found');
-    return t.status === 'done' ? pick(t, 'already_done') : pick(t, 'requested');
+    if (opts.allowedTaskIds && !opts.allowedTaskIds.has(t.taskId)) return pick(null, 'none_ready');
+    return finished(t) ? pick(t, 'already_done') : pick(t, 'requested');
   }
   if (tasks.length === 0) return pick(null, 'empty');
 
@@ -44,6 +45,7 @@ export function pickNextTask(state: ProjectState, me: string, agent: string, opt
       (t) =>
         t.ready &&
         !finished(t) &&
+        (!opts.allowedTaskIds || opts.allowedTaskIds.has(t.taskId)) &&
         t.claims.length === 0 &&
         (t.assignee === 'any' || t.assignee === me) &&
         pathsOverlap(t.paths, heldPaths).length === 0,

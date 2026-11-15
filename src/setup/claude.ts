@@ -32,7 +32,8 @@ export const CLAUDE_MD_BLOCK = `${BEGIN}
 
 - Read \`IMPORTANT.md\` and the Catalyst briefing first (\`get_briefing\` if you did not get one).
 - Lead (main session): post the work with \`post_tasks\` (ids, "done" criteria, paths, \`dependsOn\`), then spawn subagents.
-- Subagents: \`take_next_task\` → do the work → \`complete_task\` with evidence → \`take_next_task\` again.
+- Subagents: \`take_next_task\` → \`checkpoint_task\` with a plan before editing → work with milestone checkpoints → \`complete_task\` with evidence → \`take_next_task\` again.
+  Checkpoint before waiting, handing off or ending; include blockers, evidence and concrete next steps.
   When blocked or waiting, call \`wait_for_updates\` instead of stopping.
 - \`publish_decision\` before writing code others depend on (interfaces, schemas, file layout).
 - Ask with \`send_message\` (to "Namit", "Namit/api" or "all") instead of guessing.
