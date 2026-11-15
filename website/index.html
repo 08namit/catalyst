@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Catalyst — the communication layer for ai agents</title>
-<meta name="description" content="Catalyst connects two developers' Claude Code sessions with shared goals, tasks, decisions, progress and questions over a direct, encrypted peer link.">
+<meta name="description" content="Catalyst connects two developers' Claude Code sessions with shared project knowledge over a direct, encrypted peer link. Explore the v0.2 preview: named subagents, a shared task queue and conversational setup.">
 <meta name="theme-color" content="#000000">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="landing.css">
@@ -12,7 +12,7 @@
 
 </head>
 <body>
-<a class="skip" href="#setup">Skip to content</a>
+<a class="skip" href="#main">Skip to content</a>
 <div class="progress" aria-hidden="true"></div>
 <header class="nav"><div class="wrap">
   <a class="brand" href="index.html">Catalyst</a>
@@ -20,7 +20,7 @@
     <li><a href="#setup">Setup</a></li>
     <li><a href="#how">How it works</a></li>
     <li><a href="#what">What it does</a></li>
-    <li><a href="#about">What we do</a></li>
+    <li><a href="#agents">v0.2 preview</a></li>
     <li><a href="install.html">Install</a></li>
   </ul></nav>
 </div></header>
@@ -28,7 +28,8 @@
   <li><a href="#setup" aria-label="Setup"></a></li>
   <li><a href="#how" aria-label="How it works"></a></li>
   <li><a href="#what" aria-label="What it does"></a></li>
-  <li><a href="#about" aria-label="What we do"></a></li>
+  <li><a href="#agents" aria-label="v0.2 preview"></a></li>
+  <li><a href="#about" aria-label="Handover"></a></li>
 </ul></nav>
 
 <main id="main">
@@ -48,10 +49,10 @@
     <p class="reaction-eyebrow">Independent agents. One shared context.</p>
     <h1 id="hero-title">Catalyst</h1>
     <p class="reaction-tagline">the communication layer for ai agents</p>
-    <p class="reaction-product">Bring goals, decisions, and progress together.<br>Keep your agents working in the same direction.</p>
+    <p class="reaction-product">Two developers. Two laptops. Shared project knowledge.<br>Now in v0.2 preview: named subagents and one task queue.</p>
     <div class="reaction-actions">
       <a class="reaction-primary" href="install.html">Get started</a>
-      <a class="reaction-secondary" href="#how">See how it works</a>
+      <a class="reaction-secondary" href="#agents">Explore v0.2 preview</a>
     </div>
   </div>
 
@@ -59,9 +60,9 @@
 </section>
 
 <section id="setup" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>01</b> Setup</div>
+  <div class="label reveal"><b>01</b> Setup · v0.1 on main</div>
   <h2 class="stmt"><span class="beat a">Init.</span><span class="beat b">Pair.</span><span class="beat s">Join.</span></h2>
-  <p class="sub reveal">Two laptops. One shared direction.</p>
+  <p class="sub reveal">The current main branch connects two Claude Code sessions. Install from source on both laptops, then pair your project.</p>
   <div class="trio reveal">
     <div><h3>Init</h3><pre class="cmd">catalyst init --name "Tiam"</pre></div>
     <div><h3>Pair</h3><pre class="cmd">catalyst pair</pre></div>
@@ -72,14 +73,14 @@
 
 <section id="how" class="stmt-sec"><div class="wrap sec">
   <div class="label reveal"><b>02</b> How it works</div>
-  <h2 class="stmt"><span class="beat">No server.</span><span class="beat s">Just peers.</span></h2>
-  <p class="sub reveal">A local daemon on each laptop. Encrypted, direct, signed.</p>
-  <div class="arch reveal gap-lg" role="img" aria-label="Diagram. On each laptop, Claude Code connects through hooks and a stdio MCP adapter to a local daemon holding a SQLite log, a loopback API and a dashboard. The two daemons sync directly over a TLS 1.2 PSK link on the LAN using signed events.">
+  <h2 class="stmt"><span class="beat">No hosted service.</span><span class="beat s">Just peers.</span></h2>
+  <p class="sub reveal">A local daemon on each laptop. Direct TLS encryption over LAN or VPN. Every event signed by its author.</p>
+  <div class="arch reveal gap-lg" role="img" aria-label="Diagram. On each laptop, Claude Code connects through hooks and a stdio MCP adapter to a local daemon holding a SQLite log, a loopback API and a dashboard. The two daemons sync directly over a TLS 1.2 PSK link on LAN or VPN using signed events.">
 <pre aria-hidden="true"> Laptop A                                                   Laptop B
  ┌───────────────────────────────┐                ┌───────────────────────────────┐
  │ Claude Code ─ hooks ──────┐   │                │   ┌────── hooks ─ Claude Code │
  │      │                    ▼   │  TLS 1.2 PSK   │   ▼                    │      │
- │  catalyst mcp ──► daemon ◄────┼──── (LAN) ─────┼──► daemon ◄── catalyst mcp    │
+ │  catalyst mcp ──► daemon ◄────┼── (LAN/VPN) ───┼──► daemon ◄── catalyst mcp    │
  │  (stdio)     127.0.0.1 API    │  signed events │   127.0.0.1 API     (stdio)   │
  │              SQLite log       │                │   SQLite log                  │
  │              dashboard        │                │   dashboard                   │
@@ -107,24 +108,54 @@
 <section id="what" class="stmt-sec"><div class="wrap sec">
   <div class="label reveal"><b>03</b> What it does</div>
   <h2 class="stmt"><span class="beat a">Goals.</span><span class="beat b">Tasks.</span><span class="beat s">Decisions.</span><span class="beat a">Progress.</span><span class="beat b">Questions.</span></h2>
-  <p class="sub reveal">Shared between agents. Never source files.</p>
+  <p class="sub reveal">Share project knowledge: goals, decisions, ownership, progress, blockers, questions and replies. Conversations, hidden reasoning and source files stay outside Catalyst. Git still moves the code.</p>
   <div class="chips reveal" aria-label="Some MCP tools"><span>get_briefing</span><span>claim_task</span><span>publish_decision</span><span>publish_progress</span><span>send_message</span><span>resolve_conflict</span></div>
+  <div class="grid cols-2 reveal">
+    <div class="card"><h3>Keep conflicts visible</h3><p>Competing decisions and task claims stay visible until someone resolves them. History is preserved; timestamps do not pick a winner. Ownership is advisory.</p></div>
+    <div class="card"><h3>Know what reached an agent</h3><p>Saved locally, delivered, retrieved and acknowledged are separate states. A connected peer is not proof that Claude has read an update.</p></div>
+  </div>
   <figure class="shot reveal gap-lg"><div class="shot-scroll" tabindex="0" role="region" aria-label="Dashboard screenshot (scrollable)"><img src="assets/dashboard-live.png" alt="Catalyst dashboard showing live data from a two-node demo" width="1440" height="3400" loading="lazy"></div><figcaption>The local dashboard, live data from a two-node demo.</figcaption></figure>
 </div></section>
 
+<section id="agents" class="stmt-sec"><div class="wrap sec">
+  <div class="label reveal"><b>04</b> v0.2 preview · separate branch</div>
+  <h2 class="stmt"><span class="beat">Many agents.</span><span class="beat s">One queue.</span></h2>
+  <p class="sub reveal">One lead Claude Code session per developer, with several named subagents on each laptop. Everyone works from the same project context and task queue.</p>
+  <p class="note reveal"><strong>Implemented on <code>v0.2-agents</code>, not merged into main.</strong> The features below describe that preview. The setup above remains the v0.1 workflow.</p>
+  <div class="grid cols-2 reveal">
+    <div class="card"><h3>Every agent has a name</h3><p>See “Tiam / api” and “Namit / tests” across both laptops. Claims, decisions, progress, unread updates and acknowledgements are tracked per agent.</p></div>
+    <div class="card"><h3>Pick up the next ready task</h3><p>The lead posts tasks with dependencies and assignees. Free agents on either laptop claim ready work, finish it with evidence and take the next task.</p></div>
+    <div class="card"><h3>Set up by talking to Claude</h3><p>After a one-time installation, ask Claude to set up Catalyst and invite your teammate. Your teammate joins with the private invitation; you compare confirmation codes.</p></div>
+    <div class="card"><h3>Ask the right agent</h3><p>Address questions to a person or an agent such as “Namit/api”. Waiting agents can call <code>wait_for_updates</code> for replies or new work. Hooks cannot wake an idle session.</p></div>
+  </div>
+  <div class="chips reveal" aria-label="Preview MCP tools"><span>post_tasks</span><span>take_next_task</span><span>complete_task</span><span>wait_for_updates</span><span>catalyst_status</span></div>
+  <div class="card gap-lg reveal">
+    <h3>Give the team a shared plan</h3>
+    <p>Once both laptops are connected on the preview, tell Claude:</p>
+    <pre class="cmd">Build the notes app. Split it into tasks, post them to Catalyst,
+and use 3 subagents to work through the queue.</pre>
+    <p class="small" style="margin-top:16px">Run <code>catalyst</code> for a short summary of the connection, agents, queue and conflicts. Ask Claude to pause or resume sync when needed.</p>
+  </div>
+  <div class="grid cols-2 reveal">
+    <div class="card"><h3>What has been verified</h3><p>The v0.2 handover records 186 unit and integration tests, 25 end-to-end tests, and a headless run with two lead sessions and two subagents each. All three posted tasks completed across both nodes.</p></div>
+    <div class="card"><h3>What still needs validation</h3><p>Interactive installation and conversational setup, hooks after restart, and a physical two-laptop run with multiple agents remain pending. Protocol v2 cannot sync with v0.1 data: recreate and re-pair preview projects.</p></div>
+  </div>
+  <p class="small reveal" style="margin-top:24px">Preview evidence is recorded in <code>IMPORTANT.md</code> and <code>DEMO.md</code> on the local <code>v0.2-agents</code> branch. <a href="install.html#preview">Preview setup and compatibility →</a></p>
+</div></section>
+
 <section id="about" class="stmt-sec"><div class="wrap sec">
-  <div class="label reveal"><b>04</b> What we do</div>
+  <div class="label reveal"><b>05</b> The handover</div>
   <h2 class="stmt"><span class="beat">Developers and agents,</span><span class="beat s">together.</span><span class="beat">Even apart.</span></h2>
   <p class="sub reveal">Different schedules. Same picture.</p>
   <p class="mono-xl reveal">IMPORTANT<span>.md</span></p>
-  <p class="sub reveal">The handover: context, tasks, bugs, next steps. Generated by Catalyst. Yours to extend.</p>
-  <p class="small reveal" style="margin-top:20px">Code stays in Git.</p>
+  <p class="sub reveal">A generated handover with the goal, task owners, decisions, conflicts, bugs, evidence and next steps. Synced replicas produce identical text; your own notes stay outside the generated block.</p>
+  <p class="small reveal" style="margin-top:20px">Built for two developers on a reachable LAN or VPN. No relay or NAT traversal. Each developer uses their own Claude access; model usage is billed as usual.</p>
 </div></section>
 
 </main>
 
 <footer><div class="wrap">
-  <p>Catalyst v0.1 · In development · MIT licensed · Claude usage is billed separately as usual</p>
+  <p>Catalyst v0.1 on main · v0.2 preview on a separate branch · MIT licensed</p>
   <p><a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a> · <a href="install.html">Installation</a></p>
 </div></footer>
 </body>

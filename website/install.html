@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Install — Catalyst</title>
-<meta name="description" content="Install Catalyst from source: prerequisites, pairing two laptops, and using it with Claude Code.">
+<meta name="description" content="Install Catalyst v0.1 from source or try the separate v0.2 preview with named Claude subagents, a shared task queue and conversational setup.">
 <meta name="theme-color" content="#000000">
 <link rel="stylesheet" href="styles.css">
 <script src="script.js" defer></script>
@@ -26,12 +26,13 @@
   <div class="kicker">Installation</div>
   <h1>Install Catalyst</h1>
   <p class="lead"><strong>Install from source.</strong> Catalyst v0.1 is in development and is not published to npm. Every command below runs from a clone of the repository.</p>
+  <p><a href="#preview">Looking for the v0.2 agents preview?</a> It is a separate, unmerged branch with additional setup steps.</p>
 </div>
 
 <section><div class="wrap">
   <h2>1. Prerequisites (both laptops)</h2>
   <ul>
-    <li><strong>Node.js ≥ 22.13</strong> (24 LTS recommended)</li>
+    <li><strong>Node.js ≥ 22.13</strong></li>
     <li><strong>git</strong></li>
     <li><strong>Claude Code</strong> (the <code>claude</code> command)</li>
     <li>Both laptops on the same LAN or VPN, able to reach each other over TCP</li>
@@ -46,7 +47,7 @@ npm install
 npm run build
 npm link            <span class="c"># puts `catalyst` on your PATH</span>
 catalyst --version</pre>
-  <p class="small" style="margin-top:12px">The repository is currently private on GitHub, so you may need access first. Remove the command later with <code>npm unlink -g catalyst-coord</code>.</p>
+  <p class="small" style="margin-top:12px">Remove the command later with <code>npm unlink -g catalyst-coord</code>.</p>
 </div></section>
 
 <section><div class="wrap">
@@ -97,6 +98,25 @@ catalyst peer resume</pre>
   </div>
 </div></section>
 
+<section id="preview"><div class="wrap">
+  <div class="kicker">Separate branch · Preview</div>
+  <h2>v0.2: named agents and a shared task queue</h2>
+  <p>This preview adds named Claude subagents, a shared queue, and setup through Claude. It is not merged into v0.1 or published as a remote install. Each developer needs the local <code>v0.2-agents</code> branch available in their Catalyst checkout. From that Catalyst checkout, create a separate worktree to try the preview without merging it:</p>
+<pre class="cmd">git worktree add ../catalyst-preview v0.2-agents
+cd ../catalyst-preview
+npm install
+npm link
+catalyst install</pre>
+  <p><code>npm link</code> switches the global <code>catalyst</code> command to this preview checkout. Use a fresh test project. Repeat on the other developer’s machine, where that branch must also be available locally. Do not merge the branch to try the preview.</p>
+  <h3>Connect and try the preview</h3>
+  <ol>
+    <li>In the project, open Claude Code and say: <em>“Set up Catalyst and invite my teammate.”</em> Send the <code>cat1_…</code> invitation privately to your teammate.</li>
+    <li>Your teammate says: <em>“Join Catalyst with cat1_…”</em>. Compare the confirmation codes and restart Claude Code on both laptops so hooks load.</li>
+    <li>Ask Claude to plan work as Catalyst tasks, publish the decisions the agents need, then use subagents to work through the shared queue. Run <code>catalyst</code> for a brief status.</li>
+  </ol>
+  <div class="card"><h3>Preview status and compatibility</h3><p>v0.2 uses protocol v2 and cannot sync with v0.1 project data. Create a fresh Catalyst project and pair again. The headless two-node, multiagent run is documented; interactive setup and physical two-laptop multiagent validation are still pending. Treat this as a preview and expect to recreate preview projects when returning to v0.1.</p><p>Known gaps: the lead cannot rename itself with <code>set_agent_name</code>, and hook activity captured while the daemon is down is imported as the lead’s activity.</p></div>
+</div></section>
+
 <section><div class="wrap">
   <h2>Uninstall</h2>
 <pre class="cmd">catalyst uninstall claude   <span class="c"># removes only Catalyst's entries from .mcp.json, .claude/settings.json, CLAUDE.md</span>
@@ -108,6 +128,6 @@ npm unlink -g catalyst-coord</pre>
 </div></section>
 </main>
 
-<footer><div class="wrap"><p>Catalyst v0.1 · In development · MIT licensed · <a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a></p></div></footer>
+<footer><div class="wrap"><p>Catalyst v0.1 on main · v0.2 preview on a separate branch · MIT licensed · <a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a></p></div></footer>
 </body>
 </html>
