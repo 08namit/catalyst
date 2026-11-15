@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Install — Catalyst</title>
+<meta name="description" content="Install Catalyst from source: prerequisites, pairing two laptops, and using it with Claude Code.">
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="styles.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">Catalyst</a>
+  <nav aria-label="Primary"><ul>
+    <li><a href="index.html#setup">Setup</a></li>
+    <li><a href="index.html#how">How it works</a></li>
+    <li><a href="install.html" aria-current="page">Install</a></li>
+  </ul></nav>
+</div></header>
+
+<main id="main">
+<div class="wrap page-head">
+  <div class="kicker">Installation</div>
+  <h1>Install Catalyst</h1>
+  <p class="lead"><strong>Install from source.</strong> Catalyst v0.1 is in development and is not published to npm. Every command below runs from a clone of the repository.</p>
+</div>
+
+<section><div class="wrap">
+  <h2>1. Prerequisites (both laptops)</h2>
+  <ul>
+    <li><strong>Node.js ≥ 22.13</strong> (24 LTS recommended)</li>
+    <li><strong>git</strong></li>
+    <li><strong>Claude Code</strong> (the <code>claude</code> command)</li>
+    <li>Both laptops on the same LAN or VPN, able to reach each other over TCP</li>
+  </ul>
+</div></section>
+
+<section><div class="wrap">
+  <h2>2. Install from source (both laptops)</h2>
+<pre class="cmd">git clone https://github.com/08namit/catalyst.git catalyst
+cd catalyst
+npm install
+npm run build
+npm link            <span class="c"># puts `catalyst` on your PATH</span>
+catalyst --version</pre>
+  <p class="small" style="margin-top:12px">The repository is currently private on GitHub, so you may need access first. Remove the command later with <code>npm unlink -g catalyst-coord</code>.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>3. Pair a project</h2>
+  <p>Each developer works in their own clone of the <em>project</em>, not of Catalyst. Each checkout counts as one participant.</p>
+  <div class="two">
+    <div class="card"><h3>Developer A</h3>
+<pre class="cmd">cd ~/code/your-project
+catalyst init --name "Tiam"
+catalyst pair</pre>
+      <p class="small" style="margin-top:12px"><code>init</code> creates <code>.catalyst/</code> (gitignored), installs the Claude Code integration and starts the daemon. <code>pair</code> prints a single-use invitation valid for 15 minutes. If the advertised address is wrong, use <code>catalyst pair --host &lt;ip&gt;</code>.</p>
+<pre class="cmd">git add .mcp.json .claude/settings.json CLAUDE.md .gitignore
+git commit -m "Add Catalyst"</pre>
+    </div>
+    <div class="card"><h3>Developer B</h3>
+<pre class="cmd">cd ~/code/your-project
+catalyst join cat1_… --name "Namit"</pre>
+      <p class="small" style="margin-top:12px">Send the <code>cat1_…</code> token over a private channel. Then run <code>catalyst status</code> on both laptops and compare the 8-character confirmation code. If it differs, stop.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>4. Use it from Claude Code</h2>
+<pre class="cmd">claude</pre>
+  <p style="margin-top:12px">Start Claude Code in the project on both laptops. In an interactive session, approve the <code>catalyst</code> MCP server when prompted. The first SessionStart briefing appears automatically.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>5. Check the connection</h2>
+<pre class="cmd">catalyst status       <span class="c"># peer state, pending deliveries, sessions, conflicts</span>
+catalyst doctor       <span class="c"># installation, permissions, daemon health, Claude setup</span>
+catalyst dashboard    <span class="c"># opens the local dashboard (optional)</span></pre>
+</div></section>
+
+<section><div class="wrap">
+  <h2>6. Try an outage</h2>
+<pre class="cmd">catalyst peer pause
+catalyst peer resume</pre>
+  <p style="margin-top:12px">Pausing stops peer networking only. Both sessions keep working and new events are saved locally and queued. On resume, missed events replay and <code>catalyst status</code> shows the queue draining.</p>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Network and trust</h2>
+  <div class="grid cols-2" style="margin-top:20px">
+    <div class="card"><h3>Network</h3><p>Allow inbound TCP on the peer port shown by <code>catalyst status</code>, and allow <code>node</code> if macOS asks. There is no NAT traversal and no relay. The local API and dashboard listen on <code>127.0.0.1</code> only.</p></div>
+    <div class="card"><h3>Trust</h3><p>An invitation is a bearer secret for 15 minutes and single-use. The peer link is TLS 1.2 PSK with forward secrecy. Every event is Ed25519-signed. Peer content reaches agents as quoted data, never as instructions.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Uninstall</h2>
+<pre class="cmd">catalyst uninstall claude   <span class="c"># removes only Catalyst's entries from .mcp.json, .claude/settings.json, CLAUDE.md</span>
+catalyst stop
+rm -rf .catalyst            <span class="c"># deletes this project's local event log, identity and keys. Cannot be undone.</span>
+npm unlink -g catalyst-coord</pre>
+  <p style="margin-top:24px">Catalyst shares context, not source files. Keep using Git to integrate code.</p>
+  <a class="btn" href="index.html">Back to overview</a>
+</div></section>
+</main>
+
+<footer><div class="wrap"><p>Catalyst v0.1 · In development · MIT licensed · <a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a></p></div></footer>
+</body>
+</html>

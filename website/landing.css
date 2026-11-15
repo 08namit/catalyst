@@ -1,0 +1,75 @@
+:root { --bg: #000; --fg: #f5f5f5; --fg-2: #b5b5bb; --fg-3: #8c8c94; }
+body { background: #000; }
+.nav { background: transparent; backdrop-filter: none; }
+.nav.scrolled { background: #000d; backdrop-filter: blur(16px); }
+.progress { background: #c7c7d6; }
+.reaction-hero {
+  position: relative; min-height: 100vh; min-height: 100svh;
+  display: grid; place-items: center; padding: 110px 24px;
+  border: 0; background: #000; overflow: hidden; isolation: isolate;
+}
+.layer-scene { position: absolute; inset: 0; perspective: 1300px; pointer-events: none; }
+.layer-tilt { position: absolute; inset: 0; transform-style: preserve-3d; }
+.flat-layer, .shared-layer {
+  position: absolute; left: 50%; top: 30%; width: min(43vw,560px); height: min(27vw,330px);
+  border: 1px solid #8b8ba34d; border-radius: 3px;
+  background: linear-gradient(135deg,#17171cbb,#060608db); color: #aaaab8;
+  box-shadow: 0 0 0 1px #ffffff03 inset,0 24px 70px #0007;
+  padding: 23px; transform-style: preserve-3d;
+}
+.flat-layer { animation: assemble 13s cubic-bezier(.45,0,.2,1) infinite; }
+.flat-layer span, .shared-layer>span { display: block; font: 10px ui-monospace,SFMono-Regular,Menlo,monospace; text-transform: uppercase; letter-spacing: .12em; }
+.flat-layer span, .flat-layer i { animation: dissolve-details 13s ease infinite; }
+.flat-layer i { display: block; height: 1px; width: 76%; background: #9292ac30; margin-top: 30px; }
+.flat-layer i:nth-child(3) { width: 54%; }
+.flat-layer i:nth-child(4) { width: 65%; }
+.layer-1 { --x: -35vw; --y: -12vh; --r: -27deg; --z: -80px; --depth: -70px; border-color: #8a8aaf55; }
+.layer-2 { --x: 27vw; --y: -16vh; --r: 24deg; --z: -30px; --depth: -35px; }
+.layer-3 { --x: -40vw; --y: 19vh; --r: -14deg; --z: 60px; --depth: 0px; }
+.layer-4 { --x: 36vw; --y: 21vh; --r: 19deg; --z: -20px; --depth: 35px; border-color: #ababcc55; }
+.layer-5 { --x: -22vw; --y: 39vh; --r: 18deg; --z: 20px; --depth: 70px; }
+.layer-6 { --x: 23vw; --y: 42vh; --r: -19deg; --z: 80px; --depth: 105px; }
+.shared-layer {
+  transform: translate(-50%,-50%) rotateX(58deg) rotateZ(-32deg) translateZ(140px);
+  animation: shared-context 13s ease infinite; border-color: #c9c9e77a;
+  background: linear-gradient(135deg,#272730e8,#101014f5);
+}
+.shared-rule { height: 1px; background: #aaaac144; margin: 24px 0; }
+.shared-layer p { color: #e2e2eb; font-size: clamp(16px,2.3vw,30px); letter-spacing: -.035em; line-height: 1.2; }
+@keyframes assemble {
+  0%, 12%, 100% { transform: translate(-50%,-50%) translate3d(var(--x),var(--y),var(--z)) rotateX(18deg) rotateY(-8deg) rotateZ(var(--r)); opacity: .65; }
+  48%, 74% { transform: translate(-50%,-50%) rotateX(58deg) rotateZ(-32deg) translateZ(var(--depth)); opacity: .5; }
+}
+@keyframes dissolve-details { 0%,18%,100% { opacity: .8; } 42%,80% { opacity: 0; } }
+@keyframes shared-context { 0%,28%,96%,100% { opacity: 0; } 48%,74% { opacity: 1; } }
+.reaction-content { position: relative; z-index: 2; width: 100%; text-align: center; pointer-events: none; padding-top: 80px; }
+.reaction-eyebrow { margin: 0 0 26px; color: #b8b8c2; font: 10px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing: .12em; text-transform: uppercase; }
+.reaction-hero h1 { font-size: clamp(82px,18vw,246px); font-weight: 500; line-height: .98; letter-spacing: -.075em; margin: 0; color: #f5f5f5; text-shadow: 0 4px 40px #000; }
+.reaction-tagline { margin: 28px 0 0; font-size: clamp(14px,1.7vw,21px); line-height: 1.5; letter-spacing: -.015em; color: #d1d1d9; text-shadow: 0 2px 10px #000; }
+.reaction-product { font-size: 13px; color: #96969f; line-height: 1.7; margin: 24px auto 0; text-shadow: 0 2px 10px #000; }
+.reaction-actions { display: flex; justify-content: center; align-items: center; gap: 28px; margin-top: 28px; pointer-events: auto; }
+.reaction-primary { padding: 12px 24px; background: #eee; color: #111; border-radius: 999px; text-decoration: none; font-size: 12px; transition: background .2s,transform .2s; }
+.reaction-primary:hover { background: #fff; transform: translateY(-2px); }
+.reaction-secondary { font-size: 12px; color: #d0d0d6; text-decoration: none; padding: 12px 0; }
+.reaction-secondary:hover { color: #fff; }
+.reaction-scroll { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 2; display: inline-flex; gap: 16px; align-items: center; padding: 8px; color: #8e8e98; text-decoration: none; font-size: 11px; letter-spacing: .025em; }
+.reaction-scroll:hover { color: #fff; }
+@media (max-width: 700px) {
+  .reaction-hero { padding: 100px 20px; }
+  .reaction-content { padding-top: 30px; }
+  .reaction-hero h1 { font-size: clamp(68px,18vw,126px); }
+  .reaction-tagline { margin-top: 22px; font-size: clamp(12px,3.5vw,17px); }
+  .reaction-eyebrow { font-size: 8px; letter-spacing: .08em; }
+  .reaction-product { font-size: 12px; }
+  .flat-layer, .shared-layer { top: 28%; width: 65vw; height: 43vw; padding: 14px; }
+  .flat-layer span, .shared-layer>span { font-size: 7px; }
+  .shared-rule { margin: 14px 0; }
+  .flat-layer i { margin-top: 18px; }
+  .layer-scene { perspective: 900px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flat-layer { animation: none; transform: translate(-50%,-50%) rotateX(58deg) rotateZ(-32deg) translateZ(var(--depth)); opacity: .35; }
+  .flat-layer span, .flat-layer i { animation: none; opacity: 0; }
+  .shared-layer { animation: none; opacity: 1; }
+  .reaction-primary { transition: none; }
+}
