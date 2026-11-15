@@ -1,6 +1,6 @@
 # Catalyst architecture and recovery
 
-This document describes the v0.2 design, what it does today, and the recovery implementation on `feature/agent-recovery`. Catalyst coordinates Claude Code sessions on separate project checkouts. It shares structured project context and task state; Git remains responsible for moving source code.
+This document describes the v0.2 design, what it does today, and the recovery implementation integrated into `main`. Catalyst coordinates Claude Code sessions on separate project checkouts. It shares structured project context and task state; Git remains responsible for moving source code.
 
 ## Stack
 
@@ -66,7 +66,7 @@ The queue and Git are complementary. Catalyst records who intends to work on a t
 - Peer event content is project data, not an instruction or permission. A paired peer can still publish arbitrary project events, so only pair with trusted collaborators.
 - Catalyst has no hosted relay or NAT traversal. Direct peer reachability through the LAN/VPN and firewall is required.
 
-## Recovery state: existing v0.2 and the recovery branch
+## Recovery state: v0.2 with runtime checkpoints
 
 The existing v0.2 baseline provides `publish_progress`, a durable shared event log, a generated root handover, local snapshots, inbox drafts, queue claims, and a graceful `SubagentStop` path that releases unfinished claims when the daemon is available. The handover is intentionally a concise shared project view; it is not a detailed private recovery journal. `publish_progress` is included in that generated handover, so it should not carry private or overly detailed recovery notes.
 

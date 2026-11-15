@@ -4,23 +4,14 @@
 
 ## Before the judges arrive
 
-### Share and build the feature branch on both Macs
+### Build main on both Macs
 
-The current `feature/agent-recovery` branch is local to this checkout; the listed remote branches do not include it. Tiam must first make the branch available to Namit through an agreed shared Git remote (or transfer the checkout). Do not try the GitHub/npm install command for this local-only branch.
-
-On Tiam’s machine, after the branch is available on the agreed remote:
-
-```sh
-cd /private/tmp/catalyst-agent-recovery
-git branch --show-current
-git push <shared-remote> feature/agent-recovery
-```
-
-On Namit’s machine, fetch that exact branch, then both developers build and link the same source checkout:
+Named agents, the task queue and runtime recovery checkpoints are integrated into `main`. Install the same
+main commit on both Macs. For a new Catalyst source checkout:
 
 ```sh
-git fetch <shared-remote>
-git switch --track -c feature/agent-recovery <shared-remote>/feature/agent-recovery
+git clone --branch main https://github.com/08namit/catalyst.git catalyst
+cd catalyst
 npm install
 npm run build
 npm link
@@ -29,6 +20,8 @@ node dist/cli/index.js --version
 catalyst --version
 catalyst install
 ```
+
+For an existing clean source checkout, switch to `main` and run `git pull --ff-only` before rebuilding.
 
 Tiam runs the build/link/install commands too. `npm link` puts this checkout’s package bin on `PATH`; in `package.json`, the `catalyst` bin points to `dist/cli/index.js`. `catalyst install` registers the `catalyst` PATH command with Claude Code. Keep that command on PATH because `.mcp.json` and hooks invoke `catalyst`. `node dist/cli/index.js --version` checks the built entry point directly; it does not replace `npm link` or the PATH command used by Claude. Rebuild and relink after switching to a different branch or changing compiled code.
 
@@ -93,7 +86,7 @@ If the judge interrupts with a question, skip a repeated explanation; keep the f
 
 ## Actual checkpoint handoff evidence
 
-Rehearse this before the visit using the feature branch and a real task in the clean demo project:
+Rehearse this before the visit using the current main build and a real task in the clean demo project:
 
 1. The lead posts a small task such as `handoff-demo` with a clear done condition and allowed paths.
 2. The first subagent takes the task, starts work, and calls `checkpoint_task` with `taskId`, `status: "in_progress"`, a concise `summary`, and concrete `nextSteps` (plus evidence/paths where useful).
@@ -109,7 +102,7 @@ This demonstrates a **graceful subagent stop**. It does not promise recovery aft
 
 ## Clearly labelled 15-second live pause
 
-Pre-check both project folders are connected and an actual `catalyst` command resolves to the linked branch build. Use only in the booth if the prepared state is ready; otherwise show the captured evidence.
+Pre-check both project folders are connected and an actual `catalyst` command resolves to the linked main build. Use only in the booth if the prepared state is ready; otherwise show the captured evidence.
 
 On Tiam’s demo project:
 

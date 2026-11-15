@@ -177,3 +177,12 @@ own claims, decisions, acks and unread; a shared task queue spans both laptops; 
 
 Not verified yet: interactive sessions (MCP approval, trust dialog, hooks after restart), `catalyst install` against
 a real user config, `start_project`/`join_project` driven by a real Claude session, two physical laptops.
+
+
+## Main integration (2026-11-15)
+
+User authorized merging and pushing the completed v0.2 coordination, runtime recovery and website work to main.
+Source milestones: `ac5d01f` (v0.2), `1f272b4` (recovery/study tools), `8c493e8` (website content).
+The integrated application requires protocol v2; v0.1 projects must be recreated and re-paired.
+Physical two-laptop/interactive validation and the measured Catalyst-vs-notes study remain pending.
+See IMPORTANT.md for the latest checks and branch state.

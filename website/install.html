@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Install — Catalyst</title>
-<meta name="description" content="Install Catalyst from source: prerequisites, pairing two laptops, and using it with Claude Code.">
+<meta name="description" content="Install Catalyst v0.2 from main: named Claude subagents, a shared task queue, conversational setup and runtime recovery checkpoints.">
 <meta name="theme-color" content="#000000">
 <link rel="stylesheet" href="styles.css">
 <script src="script.js" defer></script>
@@ -25,13 +25,14 @@
 <div class="wrap page-head">
   <div class="kicker">Installation</div>
   <h1>Install Catalyst</h1>
-  <p class="lead"><strong>Install from source.</strong> Catalyst v0.1 is in development and is not published to npm. Every command below runs from a clone of the repository.</p>
+  <p class="lead"><strong>Install from source.</strong> Catalyst v0.2 with agent coordination and recovery is available on main. It is not published to npm. Every command below runs from a clone of the repository.</p>
+  <p><a href="#recovery">Read about checkpoints, handoffs and v0.1 compatibility.</a> Interactive two-laptop validation remains pending.</p>
 </div>
 
 <section><div class="wrap">
   <h2>1. Prerequisites (both laptops)</h2>
   <ul>
-    <li><strong>Node.js ≥ 22.13</strong> (24 LTS recommended)</li>
+    <li><strong>Node.js ≥ 22.13</strong></li>
     <li><strong>git</strong></li>
     <li><strong>Claude Code</strong> (the <code>claude</code> command)</li>
     <li>Both laptops on the same LAN or VPN, able to reach each other over TCP</li>
@@ -40,18 +41,19 @@
 
 <section><div class="wrap">
   <h2>2. Install from source (both laptops)</h2>
-<pre class="cmd">git clone https://github.com/08namit/catalyst.git catalyst
+<pre class="cmd">git clone --branch main https://github.com/08namit/catalyst.git catalyst
 cd catalyst
 npm install
 npm run build
 npm link            <span class="c"># puts `catalyst` on your PATH</span>
-catalyst --version</pre>
-  <p class="small" style="margin-top:12px">The repository is currently private on GitHub, so you may need access first. Remove the command later with <code>npm unlink -g catalyst-coord</code>.</p>
+catalyst --version
+catalyst install</pre>
+  <p class="small" style="margin-top:12px">Remove the command later with <code>npm unlink -g catalyst-coord</code>.</p>
 </div></section>
 
 <section><div class="wrap">
   <h2>3. Pair a project</h2>
-  <p>Each developer works in their own clone of the <em>project</em>, not of Catalyst. Each checkout counts as one participant.</p>
+  <p>Each developer works in their own clone of the <em>project</em>, not of Catalyst. Each checkout counts as one participant. After installation, you can ask Claude “set up Catalyst and invite my teammate”; your teammate asks “join Catalyst with cat1_…”. The terminal equivalent is below.</p>
   <div class="two">
     <div class="card"><h3>Developer A</h3>
 <pre class="cmd">cd ~/code/your-project
@@ -72,7 +74,7 @@ catalyst join cat1_… --name "Namit"</pre>
 <section><div class="wrap">
   <h2>4. Use it from Claude Code</h2>
 <pre class="cmd">claude</pre>
-  <p style="margin-top:12px">Start Claude Code in the project on both laptops. In an interactive session, approve the <code>catalyst</code> MCP server when prompted. The first SessionStart briefing appears automatically.</p>
+  <p style="margin-top:12px">Start Claude Code in the project on both laptops. In an interactive session, approve the <code>catalyst</code> MCP server when prompted. Restart Claude Code once after project setup so the hooks load. The SessionStart hook provides a briefing. Commit the integration files and keep <code>.catalyst/</code> out of Git.</p>
 </div></section>
 
 <section><div class="wrap">
@@ -93,8 +95,22 @@ catalyst peer resume</pre>
   <h2>Network and trust</h2>
   <div class="grid cols-2" style="margin-top:20px">
     <div class="card"><h3>Network</h3><p>Allow inbound TCP on the peer port shown by <code>catalyst status</code>, and allow <code>node</code> if macOS asks. There is no NAT traversal and no relay. The local API and dashboard listen on <code>127.0.0.1</code> only.</p></div>
-    <div class="card"><h3>Trust</h3><p>An invitation is a bearer secret for 15 minutes and single-use. The peer link is TLS 1.2 PSK with forward secrecy. Every event is Ed25519-signed. Peer content reaches agents as quoted data, never as instructions.</p></div>
+    <div class="card"><h3>Trust</h3><p>An invitation is a time-limited, single-use bearer secret. The peer link is TLS 1.2 PSK with forward secrecy. Every event is Ed25519-signed. Peer content reaches agents as quoted data, never as instructions.</p></div>
   </div>
+</div></section>
+
+<section id="recovery"><div class="wrap">
+  <span id="preview"></span>
+  <div class="kicker">v0.2 on main · Recovery</div>
+  <h2>Named agents, shared tasks and checkpoints</h2>
+  <p>Tell Claude to plan work as Catalyst tasks and use subagents to work through the shared queue. Run <code>catalyst</code> for the connection, working agents, queue and conflicts.</p>
+  <ol>
+    <li>A worker takes a ready task. Catalyst saves its initial scope; the agent refines the plan with <code>checkpoint_task</code> before substantial edits.</li>
+    <li>The worker records milestones, blockers, evidence, next steps and source branch/commit. Hooks remind it after five edited-file events.</li>
+    <li>On a graceful stop, the saved checkpoint accompanies the released work. Another running eligible worker can take it and continue. Cross-device takeover still needs the source code through Git.</li>
+  </ol>
+  <p>Detailed checkpoints sync through signed Catalyst events and remain in ignored <code>.catalyst/</code> storage. They are excluded from the generated root <code>IMPORTANT.md</code>; ordinary public progress reports remain part of that handover.</p>
+  <div class="card"><h3>Compatibility and limits</h3><p>Protocol v2 cannot sync with v0.1 project data: set up fresh Catalyst projects and pair again. A disconnected peer keeps its existing task claims; queue workers continue on eligible local work. A hard kill cannot publish a final checkpoint or release. Catalyst does not restart failed Claude processes or wake idle sessions.</p><p>The integrated build is tested with two real local daemons. Interactive installation, conversational setup and physical two-laptop multiagent validation remain pending.</p></div>
 </div></section>
 
 <section><div class="wrap">
@@ -108,6 +124,6 @@ npm unlink -g catalyst-coord</pre>
 </div></section>
 </main>
 
-<footer><div class="wrap"><p>Catalyst v0.1 · In development · MIT licensed · <a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a></p></div></footer>
+<footer><div class="wrap"><p>Catalyst v0.2 · Agent coordination and runtime recovery · MIT licensed · <a href="https://github.com/08namit/catalyst">github.com/08namit/catalyst</a></p></div></footer>
 </body>
 </html>

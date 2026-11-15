@@ -1,115 +1,79 @@
 # IMPORTANT — Catalyst handover
 
-> Read this before starting work. Update it when goals, decisions, ongoing tasks or known bugs materially change,
-> and before ending a session. No credentials here. Keep conflicting entries side by side for review.
+> Read this first. Update material goals, decisions, bugs, checks and branches before ending a session.
+> Keep credentials out. Preserve conflicting evidence for review.
 
-**Last update:** 2026-11-15 GMT — Codex recovery feature and demo preparation
+**Last update:** 2026-11-15 GMT — Codex main integration
 
-## Recovery feature and two-device study — 2026-11-15
-- User goal: explain/critique the stack, prepare an honest Catalyst vs Git+repository-notes comparison,
-  and add lean shared recovery checkpoints outside Git. Three GPT-6 Luna subagents handled review,
-  experiment/presentation documentation, and implementation; lead integrated and reviewed.
-- Isolated branch `feature/agent-recovery`, based on local `v0.2-agents` (`ac5d01f`), worktree
-  `/private/tmp/catalyst-agent-recovery`. Main and website branches are not merged. Original website
-  edits and untracked `notes-demo/` remain in the original checkout.
-- Added MCP `checkpoint_task` and signed `task.checkpoint` runtime events, automatic initial scope records,
-  milestone reminders after five edited-file hook events, takeover context, graceful-stop checkpoint/release,
-  session-scoped lead cleanup, and observed-claim guards on delayed stop releases. Lead approved the narrow
-  core API/event/state extensions; sync frames and protocol version remain unchanged. Older v2 peers relay
-  unknown checkpoint events but need this build to project/use them.
-- Checkpoint details stay in ignored `.catalyst` SQLite/snapshots/inbox and sync through the normal peer link;
-  they are excluded from generated root IMPORTANT.md. Public publish_progress remains Git-visible as before.
-  Recovery events do not determine task completion status; late checkpoints cannot reopen finished work.
-- During known peer unavailability, queue picks (including explicit requests) preserve claims and restrict
-  new work to local assignments/eligible local handoffs. Manual claim_task remains advisory; no distributed
-  lock or claim of zero conflicts under an unseen partition. Git still transfers code, not Catalyst.
-- Verification: typecheck; 197 unit/integration tests; build; 26 end-to-end tests (two real local daemons,
-  simulated agent calls, including checkpoint replay/takeover/privacy); existing two-node demo all passed.
-  Six Python result-validation tests passed; chart generation smoke-tested using synthetic QA data only.
-  `git diff --check` passed. No new physical two-device runs or comparison measurements claimed.
-- Docs: `docs/ARCHITECTURE.md`, `docs/EXPERIMENT.md`, `docs/DEMO-PRESENTATION.md`; header-only results
-  template and `scripts/experiment-results.py` generate PNG/SVG/JSON only from supplied measurements.
-- Confirmed study: Tiam + Namit, macOS, same Wi-Fi and Claude model; baseline Git + tracked notes only,
-  no chat; 180-second peer-sync pause keeping Claude/Git online. Five-minute judging slot: measure beforehand,
-  show measured graphs and a clearly labelled shortened live illustration. Preserve raw evidence outside Git.
-- Remaining limits: hard kill/power loss cannot send a final checkpoint or release; no agent supervisor or
-  crash detector is implemented. Lead SessionEnd while daemon is down retains claims; best-effort MCP/hook
-  session linking can retain unattributed lead claims. Offline stop drafts depend on last saved snapshot;
-  stop metadata may still say active; general liveness reconciliation is not implemented. Hooks do not start idle Claude turns.
-  A running worker can wait/take tasks autonomously; cross-laptop takeover requires the source commit in Git.
-- Next: make the same feature build available on both Macs, re-pair fresh v2 demo projects, run the study,
-  retain measurements/failed trials, then generate graphs. No branch push, release, or main merge performed.
+## Current goal and integration
+- User explicitly authorized checking, merging and pushing the completed features to main. This supersedes
+  the earlier instruction to keep v0.2/recovery separate. Integrates `ac5d01f` (v0.2), `1f272b4` (recovery),
+  and `8c493e8` (website updates) with Namit's existing website commit `c90ffbe` on origin/main.
+- Integration is prepared in `/private/tmp/catalyst-main-integration`; validate before the normal main push.
+  Do not force-push. Keep the historical feature branches and untracked `notes-demo/`.
+- Website and demo install instructions now describe v0.2/recovery on main, while retaining the pending
+  physical two-device validation. No website hosting configuration was found; Git push does not prove deployment.
+- `project.md` was absent; project sources are README, PLAN, PROTOCOL, DEMO, this handover and docs/.
 
-## Current goal
-Catalyst v0.1: connect two developers' Claude Code sessions (Tiam, Namit) via a per-project daemon, MCP adapter,
-hooks and direct TLS-PSK peer sync, with offline queueing, reconnect replay, conflict flagging and this kind of
-generated handover. Spec + status: `PLAN.md`. Semantics: `PROTOCOL.md`. Demo + evidence: `DEMO.md`.
+## Implemented
+- One daemon per participant checkout; stdio MCP adapter and Claude hooks; durable signed SQLite event log;
+  direct encrypted LAN/VPN peer sync, offline queueing, reconnect replay, conflict flags, dashboard and handover.
+- Named subagents, per-agent decisions/claims/progress/unread/acks and addressed messages; shared task queue
+  with dependencies/assignees; long-poll `wait_for_updates`; conversational setup, install and status tools.
+- Runtime `checkpoint_task` / signed `task.checkpoint`: initial scope, agent-authored milestones, reminders
+  after five edited-file events, bounded takeover context, graceful-stop checkpoint/release, session-scoped
+  lead cleanup, and expected-claim guards on delayed releases. Lead approved the narrow shared-contract
+  additions; sync frames/protocol version remain v2. Older v2 peers relay but do not project checkpoint events.
+- Detailed checkpoints stay in ignored `.catalyst` SQLite/snapshots/inbox and sync through the existing link.
+  They are excluded from generated root IMPORTANT.md. Public publish_progress remains Git-visible.
+  Recovery events do not determine completion status; late checkpoints cannot reopen completed tasks.
+- During known peer unavailability, queue selection (including explicit requests) preserves claims and limits
+  new work to local assignments/eligible local handoffs. Claims remain advisory; manual claim_task can warn
+  about overlap rather than lock files. Source changes still move through Git.
 
-## v0.2 (branch `v0.2-agents`, not merged): named subagents, task queue, talk-to-Claude setup
-- Why: the real two-laptop test of v0.1 passed but (1) each developer will run one Claude session that spawns
-  subagents, which v0.1 could not tell apart (silent decision overwrites, shared claims/acks), and (2) the setup
-  needed too many terminal commands and human nudges (18 min question→reply gap).
-- What changed: protocol v2 (NOT compatible with v0.1 data — re-create projects and re-pair). Signed `agent` field;
-  PreToolUse hook stamps `_caller` (Claude agent_id) on every Catalyst tool call; SubagentStart/Stop hooks register
-  and retire agents. Per-agent decisions/claims/progress/acks/unread; messages to "Namit/api". Queue tools
-  `post_tasks`, `take_next_task`, `complete_task`; `wait_for_updates` long-poll; `catalyst_status`, `pause_sync`,
-  `resume_sync`, `invite_teammate`; MCP `start_project`/`join_project` work before a project exists.
-  `catalyst install` registers the MCP server at user scope; `catalyst` (no args) prints a 6-line summary.
-- Behaviour change: a decision on a topic no longer silently replaces another agent's/person's decision — it is a
-  conflict unless the writer passes `supersedes` (the tool result says so).
-- Verified: typecheck; `npm test` 186; `npm run test:e2e` 25; two-node demo; live run of two headless lead sessions
-  each spawning 2 subagents → 3/3 queue tasks done across both nodes with no prompts after the first; merged code
-  passed 14 tests and the CLI worked.
-- Known gaps: lead cannot rename itself (`set_agent_name` from the main session returns 400); hook activity drafted
-  while the daemon is down is imported as the lead's; `catalyst install` and talk-to-Claude setup not yet tried in
-  an interactive session; `prepare` script means a failing build breaks `npm install -g github:…`.
+## Verification
+- Recovery source milestone: typecheck, 197 unit/integration tests, build, 26 end-to-end tests, existing
+  two-node demo and six Python results-validator tests passed. End-to-end tests use real local daemons with
+  simulated agent calls; they are not physical two-device or live-model comparison results.
+- Final integration checks: pending this session's run; replace this line with the actual result before push.
+- Earlier v0.2 evidence: 186 tests, 25 e2e; two headless lead sessions each spawning two subagents completed
+  3/3 queue tasks; resulting sample code passed 14 tests. Interactive setup was not established by that run.
+- Historical evidence conflict retained: original PLAN said physical two-laptop verification was untested;
+  the 2026-11-14 handover records v0.1 pairing, Q&A, replay, conflict flags and identical handover hashes on
+  Tiam/Namit's laptops. Neither establishes the new v0.2/recovery two-laptop workflow.
 
-## State: v0.1 feature-complete and verified on one machine (main)
-| Area | Owner | Status |
-|---|---|---|
-| Contracts `src/core`, `src/sync/frames.ts`, `src/client` | Tiam (lead agent) | done |
-| Store/projections/briefing/handover `src/store`, `src/handover` | Claude subagent → lead | done |
-| Sync/pairing `src/sync` | Codex → lead | done |
-| Daemon/CLI `src/daemon`, `src/cli` | Claude subagent → lead | done |
-| MCP/hooks/setup `src/mcp`, `src/hooks`, `src/setup` | Claude subagent → lead | done |
-| Dashboard/site/sample | Claude subagent | done |
-| Two-laptop verification (v0.1) | Tiam + Namit | done 2026-11-14: pairing, Q&A, outage replay, conflict flagged both sides, identical handover hash |
-| v0.2 agents/queue/simple setup | Tiam (lead agent) + 3 Claude subagents | done on branch `v0.2-agents`; needs interactive + two-laptop test (DEMO.md part C) |
+## Decisions and boundaries
+- Node >=22.13, built-in node:sqlite; MCP SDK v1, zod v4, commander, TypeScript, Vitest; static HTML/CSS/JS UI.
+- TLS 1.2 PSK peer link; Ed25519 signatures, content-addressed ids, Lamport ordering, wall time display-only.
+- Authenticate before dedupe/fork classification; conflicts preserve competing versions until explicit resolution.
+- Retrieval/ack is recorded only for rendered records; MCP write retries and fallback drafts are idempotent.
+- Protocol v2 cannot sync with v0.1 project data: create fresh projects and pair again on both devices.
+- Invite lifetime depends on the entry point: CLI pair historically defaults to 15 minutes; MCP invite defaults
+  to 30 minutes. Invites are single-use secrets; use each tool's actual result, not a blanket historical TTL claim.
 
-## Key decisions (see PROTOCOL.md for detail)
-- Node ≥ 22.13 with built-in `node:sqlite` (no native deps); MCP SDK v1; zod v4; commander; vitest; TS 7.
-- TLS 1.2 PSK `ECDHE-PSK-CHACHA20-POLY1305` peer link; invitations carry addresses + single-use secret (15 min).
-- Events: Ed25519-signed, id = sha256(canonical body), Lamport ordering; timestamps display-only (ISO enforced).
-- Conflicts = multiple live heads (decision per topic, claims per task, goal); only `conflict.resolved` clears them.
-- Authenticate before dedupe/fork classification; hello carries per-author head ids to detect divergent history.
-- Retrieval/ack only for records actually rendered to the model; default ack = what the session was shown.
-- Writes from MCP carry an idempotency key (header `x-catalyst-client-id`) reused by retries and fallback drafts.
-- IMPORTANT.md generated block is deterministic from the event set (byte-identical on synced replicas).
+## Known limits
+- No NAT traversal/relay; same LAN or reachable VPN required. No distributed lock or guaranteed zero conflicts.
+- Hard kill/power loss cannot send a final checkpoint/release. No crash detector or worker supervisor is built.
+  Hooks cannot start idle Claude turns; running workers can wait/take tasks autonomously.
+- Lead SessionEnd while daemon is down retains claims. Best-effort MCP/hook linking can retain unattributed
+  lead claims. Offline stop drafts depend on snapshots; stop metadata may still say active without reconciliation.
+- Cross-laptop takeover needs the source commit through Git; Catalyst does not transfer dirty worktrees.
+- Interactive installation/setup/trust prompts and physical two-laptop v0.2/recovery validation remain pending.
+- Lead rename via set_agent_name is not supported; daemon-down hook activity can be attributed to the lead.
+- Full synchronous projection rebuilds are suitable for small logs; scaling needs measurement.
+- npm's prepare build can make GitHub installation fail on a build error; cloning/building/linking is documented.
+- Old configured Codex MCP server failed (`codex mcp-server` unavailable in that CLI); companion plugin was used.
 
-## Verification (2026-11-14)
-- `npm run typecheck` clean; `npm test` 118 passed; `npm run test:e2e` 17 passed; `npm run build` ok;
-  `bash scripts/two-node-demo.sh` exit 0; `catalyst doctor` all checks pass on a live node.
-- Live: 5 headless `claude -p` sessions (sonnet, $1.33 total) completed demo steps 1–8 — DEMO.md part B.
-- Codex adversarial review: 8 findings, all fixed with regression tests (`test/store/security`, `consumption`,
-  `test/sync/divergence`, `test/daemon/lock`, `test/handover/in-force`).
-
-## Known bugs / limitations
-- No NAT traversal/relay; LAN/VPN only. Ownership advisory. Hooks cannot start turns.
-- Interactive-session behaviour (MCP approval prompt, trust dialog for `permissions.allow`) not verified live.
-- Session linking MCP adapter ↔ hook session is best effort (Claude pid).
-- Projection is recomputed fully on each change (fine for thousands of events, not incremental).
-- The user-level `codex` MCP server config (`codex mcp-server`) fails: Codex CLI 0.164 has no such subcommand.
-  The Codex plugin companion works and was used instead.
-- Codex task sandbox denies loopback sockets: run `test/sync` outside Codex.
-
-## Branches / commits
-- `v0.2-agents`: v0.2 (see above), branched from main `54b4df1`.
-- `main` (remote `origin` = github.com/08namit/catalyst): scaffold `a0e7f35` → implementation `fa50a5b` → review fixes + e2e `4a64094` → docs/handover fixes (latest).
+## Branches and provenance
+- main: integration target; includes Namit's website commit already present on origin/main.
+- v0.2-agents (`ac5d01f`), feature/agent-recovery (`1f272b4`), website/project-update (`8c493e8`): retained
+  historical branches, incorporated by this integration. They are local; origin exposed only main at the last fetch.
+- Previous notes said these branches were unmerged/not pushed. That was accurate before this explicit merge request.
 
 ## Next steps
-1. v0.2: Tiam + Namit run DEMO.md part C (install, talk-to-Claude setup, several subagents each) on two laptops;
-   count terminal commands and nudges; then merge `v0.2-agents` into main.
-2. Try an interactive Claude Code session in a Catalyst project (approve MCP server, accept trust dialog).
-3. Optional: dogfood Catalyst on this repo (`catalyst init` here + `catalyst join` on Namit's clone) so this file's
-   generated block comes from shared records; keep this manual section outside the markers.
-4. Consider: incremental projections; relay/NAT options; publishing to npm (not done — install is clone/build/link).
+1. Finish final integration checks and normal push to main; verify origin/main matches the tested commit.
+2. Tiam + Namit install the same main build on macOS/same Wi-Fi/same Claude model; re-pair fresh v2 projects.
+3. Run docs/EXPERIMENT.md: Git+tracked-notes baseline only, no chat; 180-second peer-sync pause with Claude/Git
+   online; retain raw measurements/failed trials outside Git. No comparison measurements are claimed yet.
+4. Use docs/DEMO-PRESENTATION.md for the five-minute booth slot; measure beforehand and label shortened live
+   illustrations. docs/ARCHITECTURE.md explains the stack; scripts/experiment-results.py plots measured CSVs.
